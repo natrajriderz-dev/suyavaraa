@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Forever Us - Modern Dating Platform</title>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: .5; }
+        }
+        .animate-pulse {
+            animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+        .line-clamp-2 {
+            overflow: hidden;
+            display: -webkit-box;
+            -webkit-box-orient: vertical;
+            -webkit-line-clamp: 2;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState } = React;
+
+        // Icon Components
+        const Heart = ({className, style}) => (
+            <svg className={className} style={style} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+            </svg>
+        );
+
+        const Shield = ({className, style}) => (
+            <svg className={className} style={style} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+            </svg>
+        );
+
+        const CheckCircle = ({className, style}) => (
+            <svg className={className} style={style} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>
+            </svg>
+        );
+
+        const MapPin = ({className, style}) => (
+            <svg className={className} style={style} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/>
+            </svg>
+        );
+
+        const Briefcase = ({className, style}) => (
+            <svg className={className} style={style} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>
+            </svg>
+        );
+
+        const MessageCircle = ({className, style}) => (
+            <svg className={className} style={style} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+            </svg>
+        );
+
+        const X = ({className, style}) => (
+            <svg className={className} style={style} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+        );
+
+        const ArrowLeft = ({className, style}) => (
+            <svg className={className} style={style} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/>
+            </svg>
+        );
+
+        const Sparkles = ({className, style}) => (
+            <svg className={className} style={style} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/>
+            </svg>
+        );
+
+        const Zap = ({className, style}) => (
+            <svg className={className} style={style} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+            </svg>
+        );
+
+        const DatingDashboard = () => {
+            const [selectedProfile, setSelectedProfile] = useState(null);
+            const [showAlert, setShowAlert] = useState(false);
+            const [alertType, setAlertType] = useState('');
+
+            const datingProfiles = [
+                {
+                    id: 1, name: 'Kavya', age: 24, location: 'Delhi', profession: 'Content Creator',
+                    verified: true, trustScore: 8.7, photo: '🎨',
+                    bio: 'Coffee lover ☕ | Travel enthusiast 🌍 | Let\'s vibe and explore the city!',
+                    interests: ['Photography', 'Music', 'Art', 'Cafes'],
+                    online: true, lastSeen: 'Online now', distance: '2 km away'
+                },
+                {
+                    id: 2, name: 'Aditya', age: 27, location: 'Pune', profession: 'Fitness Coach',
+                    verified: true, trustScore: 8.4, photo: '💪',
+                    bio: 'Fitness freak | Adventure seeker | Living life to the fullest 🏃‍♂️',
+                    interests: ['Gym', 'Hiking', 'Sports', 'Travel'],
+                    online: false, lastSeen: '2 hours ago', distance: '5 km away'
+                },
+                {
+                    id: 3, name: 'Riya', age: 25, location: 'Chennai', profession: 'UI/UX Designer',
+                    verified: true, trustScore: 9.1, photo: '🎭',
+                    bio: 'Design thinking | Bookworm 📚 | Foodie 🍕 | Looking for genuine connections',
+                    interests: ['Design', 'Reading', 'Food', 'Movies'],
+                    online: true, lastSeen: 'Online now', distance: '3 km away'
+                },
+                {
+                    id: 4, name: 'Aryan', age: 26, location: 'Mumbai', profession: 'Photographer',
+                    verified: true, trustScore: 8.8, photo: '📸',
+                    bio: 'Capturing moments | Sunset chaser 🌅 | Music lover | Let\'s create memories!',
+                    interests: ['Photography', 'Travel', 'Music', 'Nature'],
+                    online: true, lastSeen: 'Online now', distance: '1 km away'
+                },
+                {
+                    id: 5, name: 'Zara', age: 23, location: 'Bangalore', profession: 'Digital Marketer',
+                    verified: true, trustScore: 8.9, photo: '✨',
+                    bio: 'Dreamer | Startup enthusiast 🚀 | Pizza over everything 🍕 | Swipe right for good vibes',
+                    interests: ['Marketing', 'Startups', 'Food', 'Traveling'],
+                    online: false, lastSeen: '1 hour ago', distance: '4 km away'
+                },
+                {
+                    id: 6, name: 'Rohan', age: 28, location: 'Hyderabad', profession: 'Software Developer',
+                    verified: true, trustScore: 9.0, photo: '💻',
+                    bio: 'Tech geek | Gamer 🎮 | Movie buff 🎬 | Looking for someone to binge-watch with',
+                    interests: ['Gaming', 'Movies', 'Tech', 'Music'],
+                    online: true, lastSeen: 'Online now', distance: '6 km away'
+                },
+                {
+                    id: 7, name: 'Meera', age: 24, location: 'Kolkata', profession: 'Fashion Blogger',
+                    verified: true, trustScore: 8.6, photo: '👗',
+                    bio: 'Fashion enthusiast | Makeup artist 💄 | Chai lover ☕ | Here for real connections',
+                    interests: ['Fashion', 'Makeup', 'Shopping', 'Photography'],
+                    online: false, lastSeen: '30 mins ago', distance: '3 km away'
+                },
+                {
+                    id: 8, name: 'Kabir', age: 29, location: 'Jaipur', profession: 'Entrepreneur',
+                    verified: true, trustScore: 9.2, photo: '🎯',
+                    bio: 'Building dreams | Foodie 🍔 | Dog lover 🐕 | Looking for a partner in crime',
+                    interests: ['Business', 'Food', 'Dogs', 'Travel'],
+                    online: true, lastSeen: 'Online now', distance: '2 km away'
+                },
+                {
+                    id: 9, name: 'Sia', age: 22, location: 'Chandigarh', profession: 'Student & Part-time Model',
+                    verified: true, trustScore: 8.5, photo: '🌸',
+                    bio: 'Psychology student | Model | Nature lover 🌿 | Let\'s talk about everything!',
+                    interests: ['Modeling', 'Psychology', 'Nature', 'Art'],
+                    online: false, lastSeen: '4 hours ago', distance: '7 km away'
+                }
+            ];
+
+            const handleLike = () => {
+                setAlertType('like');
+                setShowAlert(true);
+            };
+
+            const handleChat = () => {
+                setAlertType('chat');
+                setShowAlert(true);
+            };
+
+            return (
+                <div className="min-h-screen bg-gradient-to-br from-pink-50 via-rose-50 to-red-50">
+                    {showAlert && (
+                        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                            <div className="bg-white rounded-2xl p-8 max-w-md w-full shadow-2xl">
+                                <div className="text-center mb-6">
+                                    <div className="w-16 h-16 bg-gradient-to-r from-pink-100 to-rose-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                                        {alertType === 'like' ? (
+                                            <Heart style={{width: '40px', height: '40px'}} className="text-pink-600" />
+                                        ) : (
+                                            <MessageCircle style={{width: '40px', height: '40px'}} className="text-blue-600" />
+                                        )}
+                                    </div>
+                                    <h2 className="text-2xl font-bold text-gray-900 mb-2">
+                                        {alertType === 'like' ? 'Like Sent! 💕' : 'Chat Request Sent! 💬'}
+                                    </h2>
+                                    <p className="text-gray-600">
+                                        {alertType === 'like' 
+                                            ? 'If they like you back, you\'ll be matched and can start chatting!'
+                                            : 'You can start chatting once they accept your request. We\'ll notify you!'}
+                                    </p>
+                                </div>
+                                <button onClick={() => setShowAlert(false)} className="w-full bg-gradient-to-r from-pink-500 to-rose-500 text-white py-3 rounded-lg font-semibold hover:opacity-90 transition">
+                                    Awesome!
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
+                    {selectedProfile && !showAlert && (
+                        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                            <div className="bg-white rounded-3xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
+                                <div className="sticky top-0 bg-white border-b p-6 flex justify-between items-center z-10">
+                                    <h2 className="text-2xl font-bold">Profile</h2>
+                                    <button onClick={() => setSelectedProfile(null)} className="p-2 hover:bg-gray-100 rounded-lg">
+                                        <X style={{width: '24px', height: '24px'}} />
+                                    </button>
+                                </div>
+                                <div className="p-6">
+                                    <div className="text-center mb-6 relative">
+                                        <div className="text-8xl mb-4">{selectedProfile.photo}</div>
+                                        {selectedProfile.online && (
+                                            <div className="absolute top-0 left-1/2 transform -translate-x-1/2 flex items-center gap-2 bg-green-500 px-4 py-2 rounded-full">
+                                                <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
+                                                <span className="text-white text-sm font-bold">Online Now</span>
+                                            </div>
+                                        )}
+                                        <h3 className="text-3xl font-bold mb-1">{selectedProfile.name}, {selectedProfile.age}</h3>
+                                        <p className="text-gray-600">{selectedProfile.profession}</p>
+                                        <div className="flex items-center justify-center gap-2 mt-3">
+                                            <Shield style={{width: '20px', height: '20px'}} className="text-pink-600" />
+                                            <span className="text-pink-600 font-bold">Trust Score: {selectedProfile.trustScore}</span>
+                                            <CheckCircle style={{width: '20px', height: '20px'}} className="text-green-600" />
+                                        </div>
+                                    </div>
+                                    
+                                    <div className="grid grid-cols-2 gap-4 mb-6">
+                                        <div className="flex items-center gap-3 p-4 bg-pink-50 rounded-lg">
+                                            <MapPin style={{width: '20px', height: '20px'}} className="text-pink-600" />
+                                            <div>
+                                                <p className="text-sm text-gray-600">Location</p>
+                                                <p className="font-semibold">{selectedProfile.location}</p>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-3 p-4 bg-pink-50 rounded-lg">
+                                            <Zap style={{width: '20px', height: '20px'}} className="text-pink-600" />
+                                            <div>
+                                                <p className="text-sm text-gray-600">Distance</p>
+                                                <p className="font-semibold">{selectedProfile.distance}</p>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-3 p-4 bg-pink-50 rounded-lg">
+                                            <Briefcase style={{width: '20px', height: '20px'}} className="text-pink-600" />
+                                            <div>
+                                                <p className="text-sm text-gray-600">Profession</p>
+                                                <p className="font-semibold">{selectedProfile.profession}</p>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-3 p-4 bg-pink-50 rounded-lg">
+                                            <div style={{width: '20px', height: '20px'}} className={selectedProfile.online ? 'text-green-600' : 'text-gray-400'}>⏰</div>
+                                            <div>
+                                                <p className="text-sm text-gray-600">Last Seen</p>
+                                                <p className="font-semibold">{selectedProfile.lastSeen}</p>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="bg-gradient-to-br from-pink-50 to-rose-50 rounded-xl p-6 mb-6">
+                                        <h4 className="font-bold text-lg mb-3 flex items-center gap-2">
+                                            <Sparkles style={{width: '20px', height: '20px'}} className="text-pink-600" />
+                                            About
+                                        </h4>
+                                        <p className="text-gray-700 leading-relaxed">{selectedProfile.bio}</p>
+                                    </div>
+
+                                    <div className="mb-6">
+                                        <h4 className="font-bold text-lg mb-3">Interests</h4>
+                                        <div className="flex flex-wrap gap-2">
+                                            {selectedProfile.interests.map((interest, idx) => (
+                                                <span key={idx} className="px-4 py-2 bg-pink-100 text-pink-600 rounded-full font-semibold">
+                                                    {interest}
+                                                </span>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6">
+                                        <div className="flex items-start gap-3">
+                                            <Shield style={{width: '20px', height: '20px'}} className="text-blue-600 mt-1" />
+                                            <div>
+                                                <p className="font-semibold text-blue-900 mb-1">AI-Protected Chat</p>
+                                                <p className="text-sm text-blue-700">All chats are monitored by AI for safety. Report any suspicious behavior immediately.</p>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex gap-3">
+                                        <button onClick={() => { handleLike(); setSelectedProfile(null); }} className="flex-1 bg-gradient-to-r from-pink-500 to-rose-500 text-white py-4 rounded-xl font-bold hover:opacity-90 transition flex items-center justify-center gap-2">
+                                            <Heart style={{width: '20px', height: '20px'}} />
+                                            Like
+                                        </button>
+                                        <button onClick={() => { handleChat(); setSelectedProfile(null); }} className="flex-1 bg-blue-600 text-white py-4 rounded-xl font-bold hover:bg-blue-700 transition flex items-center justify-center gap-2">
+                                            <MessageCircle style={{width: '20px', height: '20px'}} />
+                                            Chat
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    <header className="bg-white shadow-md sticky top-0 z-40">
+                        <div className="max-w-7xl mx-auto px-4 py-4">
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                    <button onClick={() => window.location.href = 'index.html'} className="p-2 hover:bg-gray-100 rounded-lg transition">
+                                        <ArrowLeft style={{width: '24px', height: '24px'}} />
+                                    </button>
+                                    <div className="bg-gradient-to-r from-pink-500 to-rose-500 p-2 rounded-xl">
+                                        <Sparkles style={{width: '24px', height: '24px'}} className="text-white" />
+                                    </div>
+                                    <div>
+                                        <h1 className="text-2xl font-bold text-gray-900">Forever Us</h1>
+                                        <p className="text-xs text-gray-600">Connect, Chat, and Vibe</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </header>
+
+                    <div className="max-w-7xl mx-auto px-4 py-8">
+                        <div className="bg-gradient-to-r from-pink-500 to-rose-500 rounded-2xl p-8 text-white mb-8">
+                            <h1 className="text-4xl font-bold mb-2">Welcome to Forever Us ✨</h1>
+                            <p className="text-lg opacity-90">Connect with verified people, chat instantly, and find your vibe in a safe space</p>
+                            <div className="flex flex-wrap gap-4 mt-6">
+                                <div className="flex items-center gap-2">
+                                    <CheckCircle style={{width: '20px', height: '20px'}} />
+                                    <span>AI Safety Monitoring</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <CheckCircle style={{width: '20px', height: '20px'}} />
+                                    <span>Instant Messaging</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <CheckCircle style={{width: '20px', height: '20px'}} />
+                                    <span>Verified Profiles</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <CheckCircle style={{width: '20px', height: '20px'}} />
+                                    <span>Location-Based</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div>
+                            <div className="flex items-center justify-between mb-6">
+                                <h2 className="text-2xl font-bold text-gray-900">People Near You</h2>
+                                <span className="text-gray-600">{datingProfiles.length} verified profiles</span>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                {datingProfiles.map(profile => (
+                                    <div key={profile.id} className="bg-white rounded-2xl shadow-lg overflow-hidden hover:shadow-2xl transition-all">
+                                        <div className="bg-gradient-to-br from-pink-100 to-rose-100 p-8 text-center relative">
+                                            <div className="text-6xl mb-4">{profile.photo}</div>
+                                            <div className="absolute top-4 right-4 bg-blue-500 p-2 rounded-full">
+                                                <CheckCircle style={{width: '20px', height: '20px'}} className="text-white" />
+                                            </div>
+                                            {profile.online && (
+                                                <div className="absolute top-4 left-4 flex items-center gap-2 bg-green-500 px-3 py-1 rounded-full">
+                                                    <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
+                                                    <span className="text-white text-xs font-bold">Online</span>
+                                                </div>
+                                            )}
+                                            <div className="absolute bottom-4 left-4">
+                                                <div className="flex items-center gap-1 bg-pink-500 bg-opacity-90 px-3 py-1 rounded-full">
+                                                    <Shield style={{width: '16px', height: '16px'}} className="text-white" />
+                                                    <span className="text-white font-bold text-sm">{profile.trustScore}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div className="p-6">
+                                            <div className="mb-4">
+                                                <h3 className="text-xl font-bold text-gray-900">{profile.name}, {profile.age}</h3>
+                                                <p className="text-gray-600 text-sm">{profile.profession}</p>
+                                            </div>
+
+                                            <div className="space-y-2 mb-4">
+                                                <div className="flex items-center gap-2 text-sm text-gray-700">
+                                                    <MapPin style={{width: '16px', height: '16px'}} className="text-gray-500" />
+                                                    <span>{profile.location} • {profile.distance}</span>
+                                                </div>
+                                                {!profile.online && (
+                                                    <div className="flex items-center gap-2 text-sm text-gray-600">
+                                                        <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
+                                                        <span>Last seen {profile.lastSeen}</span>
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                            <p className="text-gray-700 mb-4 line-clamp-2">{profile.bio}</p>
+
+                                            <div className="flex flex-wrap gap-2 mb-4">
+                                                {profile.interests.slice(0, 3).map((interest, idx) => (
+                                                    <span key={idx} className="px-3 py-1 bg-pink-50 text-pink-600 rounded-full text-xs font-semibold">
+                                                        {interest}
+                                                    </span>
+                                                ))}
+                                            </div>
+
+                                            <div className="flex gap-2">
+                                                <button onClick={handleLike} className="flex-1 bg-gradient-to-r from-pink-500 to-rose-500 text-white py-3 rounded-lg font-semibold hover:opacity-90 transition flex items-center justify-center gap-2">
+                                                    <Heart style={{width: '16px', height: '16px'}} />
+                                                    Like
+                                                </button>
+                                                <button onClick={() => setSelectedProfile(profile)} className="flex-1 bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition flex items-center justify-center gap-2">
+                                                    <MessageCircle style={{width: '16px', height: '16px'}} />
+                                                    Chat
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        ReactDOM.render(<DatingDashboard />, document.getElementById('root'));
+    </script>
+</body>
+</html>
