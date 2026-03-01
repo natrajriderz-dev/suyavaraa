@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 const React = require('react');
 const { NavigationContainer } = require('@react-navigation/native');
 const { createStackNavigator } = require('@react-navigation/stack');
@@ -54,3 +55,25 @@ const App = () => {
 };
 
 module.exports = App;
+=======
+import { StatusBar } from 'expo-status-bar';
+import { StyleSheet, Text, View } from 'react-native';
+
+export default function App() {
+  return (
+    <View style={styles.container}>
+      <Text>Open up App.js to start working on your app!</Text>
+      <StatusBar style="auto" />
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#fff',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+});
+>>>>>>> ecf766d0e8c43ffde3e2e2828897e39afd1f66f6

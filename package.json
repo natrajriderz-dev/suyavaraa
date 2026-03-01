@@ -1,5 +1,9 @@
 {
+<<<<<<< HEAD
   "name": "bond-app",
+=======
+  "name": "bond",
+>>>>>>> ecf766d0e8c43ffde3e2e2828897e39afd1f66f6
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
@@ -9,6 +13,7 @@
     "web": "expo start --web"
   },
   "dependencies": {
+<<<<<<< HEAD
     "@react-native-async-storage/async-storage": "^2.2.0",
     "@react-navigation/bottom-tabs": "^7.15.2",
     "@react-navigation/native": "^7.1.31",
@@ -24,6 +29,15 @@
     "react-native-gesture-handler": "~2.28.0",
     "react-native-safe-area-context": "~5.6.2",
     "react-native-screens": "~4.16.0"
+=======
+    "@expo/metro-runtime": "~6.1.2",
+    "expo": "~54.0.33",
+    "expo-status-bar": "~3.0.9",
+    "react": "19.1.0",
+    "react-dom": "19.1.0",
+    "react-native": "0.81.5",
+    "react-native-web": "^0.21.0"
+>>>>>>> ecf766d0e8c43ffde3e2e2828897e39afd1f66f6
   },
   "private": true
 }

@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Heavenly Matchmaking - Find Your Perfect Life Partner</title>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .line-clamp-2 {
+            overflow: hidden;
+            display: -webkit-box;
+            -webkit-box-orient: vertical;
+            -webkit-line-clamp: 2;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState } = React;
+
+        // Icon Components
+        const Heart = ({className, style}) => (
+            <svg className={className} style={style} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+            </svg>
+        );
+
+        const Shield = ({className, style}) => (
+            <svg className={className} style={style} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+            </svg>
+        );
+
+        const CheckCircle = ({className, style}) => (
+            <svg className={className} style={style} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>
+            </svg>
+        );
+
+        const MapPin = ({className, style}) => (
+            <svg className={className} style={style} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/>
+            </svg>
+        );
+
+        const GraduationCap = ({className, style}) => (
+            <svg className={className} style={style} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/>
+            </svg>
+        );
+
+        const Briefcase = ({className, style}) => (
+            <svg className={className} style={style} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>
+            </svg>
+        );
+
+        const Users = ({className, style}) => (
+            <svg className={className} style={style} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+            </svg>
+        );
+
+        const Eye = ({className, style}) => (
+            <svg className={className} style={style} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
+            </svg>
+        );
+
+        const X = ({className, style}) => (
+            <svg className={className} style={style} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+        );
+
+        const ArrowLeft = ({className, style}) => (
+            <svg className={className} style={style} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/>
+            </svg>
+        );
+
+        const Calendar = ({className, style}) => (
+            <svg className={className} style={style} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+            </svg>
+        );
+
+        const Star = ({className, style}) => (
+            <svg className={className} style={style} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+            </svg>
+        );
+
+        const MatrimonyDashboard = () => {
+            const [selectedProfile, setSelectedProfile] = useState(null);
+            const [showAlert, setShowAlert] = useState(false);
+
+            const matrimonyProfiles = [
+                {
+                    id: 1, name: 'Ananya Sharma', age: 28, location: 'Mumbai, Maharashtra',
+                    education: 'MBA, IIM Bangalore', profession: 'Marketing Manager',
+                    family: 'Nuclear Family, 2 Siblings', verified: true, trustScore: 9.2, photo: '👩',
+                    bio: 'Looking for a partner who values family and career equally. Passionate about traveling and exploring new cultures.',
+                    interests: ['Travel', 'Reading', 'Yoga', 'Cooking'],
+                    religion: 'Hindu', motherTongue: 'Hindi', height: '5\'5"', maritalStatus: 'Never Married'
+                },
+                {
+                    id: 2, name: 'Rohan Patel', age: 31, location: 'Bangalore, Karnataka',
+                    education: 'B.Tech, NIT Trichy', profession: 'Software Engineer at Google',
+                    family: 'Joint Family, 1 Sibling', verified: true, trustScore: 8.9, photo: '👨',
+                    bio: 'Family-oriented person seeking life partner who shares similar values. Love sports and music.',
+                    interests: ['Cricket', 'Music', 'Cooking', 'Technology'],
+                    religion: 'Hindu', motherTongue: 'Gujarati', height: '5\'10"', maritalStatus: 'Never Married'
+                },
+                {
+                    id: 3, name: 'Priya Reddy', age: 26, location: 'Hyderabad, Telangana',
+                    education: 'MBBS, AIIMS Delhi', profession: 'Doctor',
+                    family: 'Nuclear Family', verified: true, trustScore: 9.5, photo: '👩‍⚕️',
+                    bio: 'Passionate doctor looking for understanding partner who respects my profession and values.',
+                    interests: ['Healthcare', 'Dance', 'Social Work', 'Reading'],
+                    religion: 'Hindu', motherTongue: 'Telugu', height: '5\'4"', maritalStatus: 'Never Married'
+                },
+                {
+                    id: 4, name: 'Arjun Malhotra', age: 29, location: 'Delhi NCR',
+                    education: 'CA, ICAI', profession: 'Chartered Accountant',
+                    family: 'Joint Family, 2 Siblings', verified: true, trustScore: 9.0, photo: '👨‍💼',
+                    bio: 'Looking for a life partner to share dreams and build a beautiful future together.',
+                    interests: ['Finance', 'Travel', 'Photography', 'Fitness'],
+                    religion: 'Hindu', motherTongue: 'Punjabi', height: '6\'0"', maritalStatus: 'Never Married'
+                },
+                {
+                    id: 5, name: 'Kavya Nair', age: 27, location: 'Kochi, Kerala',
+                    education: 'M.Tech, IIT Madras', profession: 'Data Scientist',
+                    family: 'Nuclear Family, 1 Sibling', verified: true, trustScore: 9.3, photo: '👩‍💻',
+                    bio: 'Tech enthusiast who loves nature and traditional values. Seeking educated and family-oriented partner.',
+                    interests: ['Technology', 'Nature', 'Classical Music', 'Cooking'],
+                    religion: 'Hindu', motherTongue: 'Malayalam', height: '5\'6"', maritalStatus: 'Never Married'
+                },
+                {
+                    id: 6, name: 'Aditya Verma', age: 32, location: 'Pune, Maharashtra',
+                    education: 'MBA, XLRI Jamshedpur', profession: 'Business Manager',
+                    family: 'Nuclear Family', verified: true, trustScore: 8.8, photo: '👨‍💼',
+                    bio: 'Grounded individual with modern outlook. Looking for partner to share life\'s journey.',
+                    interests: ['Business', 'Sports', 'Travel', 'Music'],
+                    religion: 'Hindu', motherTongue: 'Hindi', height: '5\'11"', maritalStatus: 'Never Married'
+                }
+            ];
+
+            return (
+                <div className="min-h-screen bg-gradient-to-br from-purple-50 via-pink-50 to-rose-50">
+                    {showAlert && (
+                        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                            <div className="bg-white rounded-2xl p-8 max-w-md w-full shadow-2xl">
+                                <div className="text-center mb-6">
+                                    <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                                        <CheckCircle style={{width: '40px', height: '40px'}} className="text-green-600" />
+                                    </div>
+                                    <h2 className="text-2xl font-bold text-gray-900 mb-2">Interest Sent Successfully!</h2>
+                                    <p className="text-gray-600">
+                                        Background verification will be conducted by our team. Contact details will be shared after admin approval and mutual interest.
+                                    </p>
+                                </div>
+                                <button onClick={() => setShowAlert(false)} className="w-full bg-purple-600 text-white py-3 rounded-lg font-semibold hover:bg-purple-700 transition">
+                                    Got it!
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
+                    {selectedProfile && !showAlert && (
+                        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                            <div className="bg-white rounded-3xl max-w-3xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
+                                <div className="sticky top-0 bg-white border-b p-6 flex justify-between items-center z-10">
+                                    <h2 className="text-2xl font-bold">Profile Details</h2>
+                                    <button onClick={() => setSelectedProfile(null)} className="p-2 hover:bg-gray-100 rounded-lg">
+                                        <X style={{width: '24px', height: '24px'}} />
+                                    </button>
+                                </div>
+                                <div className="p-6">
+                                    <div className="text-center mb-6">
+                                        <div className="text-8xl mb-4">{selectedProfile.photo}</div>
+                                        <h3 className="text-3xl font-bold mb-2">{selectedProfile.name}</h3>
+                                        <div className="flex items-center justify-center gap-2 mb-4">
+                                            <Shield style={{width: '20px', height: '20px'}} className="text-green-600" />
+                                            <span className="text-green-600 font-semibold">Verified Profile</span>
+                                            <span className="px-3 py-1 bg-purple-100 text-purple-600 rounded-full text-sm font-bold">
+                                                Trust Score: {selectedProfile.trustScore}
+                                            </span>
+                                        </div>
+                                    </div>
+                                    
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                                        <div className="flex items-center gap-3 p-4 bg-purple-50 rounded-lg">
+                                            <Calendar style={{width: '20px', height: '20px'}} className="text-purple-600" />
+                                            <div>
+                                                <p className="text-sm text-gray-600">Age</p>
+                                                <p className="font-semibold">{selectedProfile.age} years</p>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-3 p-4 bg-purple-50 rounded-lg">
+                                            <div style={{width: '20px', height: '20px'}} className="text-purple-600">🕉️</div>
+                                            <div>
+                                                <p className="text-sm text-gray-600">Religion</p>
+                                                <p className="font-semibold">{selectedProfile.religion}</p>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-3 p-4 bg-purple-50 rounded-lg">
+                                            <MapPin style={{width: '20px', height: '20px'}} className="text-purple-600" />
+                                            <div>
+                                                <p className="text-sm text-gray-600">Location</p>
+                                                <p className="font-semibold">{selectedProfile.location}</p>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-3 p-4 bg-purple-50 rounded-lg">
+                                            <div style={{width: '20px', height: '20px'}} className="text-purple-600">🗣️</div>
+                                            <div>
+                                                <p className="text-sm text-gray-600">Mother Tongue</p>
+                                                <p className="font-semibold">{selectedProfile.motherTongue}</p>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-3 p-4 bg-purple-50 rounded-lg">
+                                            <GraduationCap style={{width: '20px', height: '20px'}} className="text-purple-600" />
+                                            <div>
+                                                <p className="text-sm text-gray-600">Education</p>
+                                                <p className="font-semibold">{selectedProfile.education}</p>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-3 p-4 bg-purple-50 rounded-lg">
+                                            <Briefcase style={{width: '20px', height: '20px'}} className="text-purple-600" />
+                                            <div>
+                                                <p className="text-sm text-gray-600">Profession</p>
+                                                <p className="font-semibold">{selectedProfile.profession}</p>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-3 p-4 bg-purple-50 rounded-lg">
+                                            <Users style={{width: '20px', height: '20px'}} className="text-purple-600" />
+                                            <div>
+                                                <p className="text-sm text-gray-600">Family Type</p>
+                                                <p className="font-semibold">{selectedProfile.family}</p>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-3 p-4 bg-purple-50 rounded-lg">
+                                            <div style={{width: '20px', height: '20px'}} className="text-purple-600">📏</div>
+                                            <div>
+                                                <p className="text-sm text-gray-600">Height</p>
+                                                <p className="font-semibold">{selectedProfile.height}</p>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="bg-gradient-to-br from-purple-50 to-pink-50 rounded-xl p-6 mb-6">
+                                        <h4 className="font-bold text-lg mb-3 flex items-center gap-2">
+                                            <Star style={{width: '20px', height: '20px'}} className="text-purple-600" />
+                                            About Me
+                                        </h4>
+                                        <p className="text-gray-700 leading-relaxed">{selectedProfile.bio}</p>
+                                    </div>
+
+                                    <div className="mb-6">
+                                        <h4 className="font-bold text-lg mb-3">Interests & Hobbies</h4>
+                                        <div className="flex flex-wrap gap-2">
+                                            {selectedProfile.interests.map((interest, idx) => (
+                                                <span key={idx} className="px-4 py-2 bg-purple-100 text-purple-600 rounded-full font-semibold">
+                                                    {interest}
+                                                </span>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6">
+                                        <div className="flex items-start gap-3">
+                                            <Shield style={{width: '20px', height: '20px'}} className="text-blue-600 mt-1" />
+                                            <div>
+                                                <p className="font-semibold text-blue-900 mb-1">Privacy Protected</p>
+                                                <p className="text-sm text-blue-700">Contact details will only be shared after both parties express interest and admin approval.</p>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <button onClick={() => { setShowAlert(true); setSelectedProfile(null); }} className="w-full bg-gradient-to-r from-purple-600 to-pink-600 text-white py-4 rounded-xl font-bold hover:opacity-90 transition text-lg flex items-center justify-center gap-2">
+                                        <Heart style={{width: '20px', height: '20px'}} />
+                                        Express Interest
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    <header className="bg-white shadow-md sticky top-0 z-40">
+                        <div className="max-w-7xl mx-auto px-4 py-4">
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                    <button onClick={() => window.location.href = 'index.html'} className="p-2 hover:bg-gray-100 rounded-lg transition">
+                                        <ArrowLeft style={{width: '24px', height: '24px'}} />
+                                    </button>
+                                    <div className="bg-gradient-to-r from-purple-600 to-pink-600 p-2 rounded-xl">
+                                        <Heart style={{width: '24px', height: '24px'}} className="text-white" />
+                                    </div>
+                                    <div>
+                                        <h1 className="text-2xl font-bold text-gray-900">Heavenly Matchmaking</h1>
+                                        <p className="text-xs text-gray-600">Find Your Perfect Life Partner</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </header>
+
+                    <div className="max-w-7xl mx-auto px-4 py-8">
+                        <div className="bg-gradient-to-r from-purple-600 to-pink-600 rounded-2xl p-8 text-white mb-8">
+                            <h1 className="text-4xl font-bold mb-2">Welcome to Heavenly Matchmaking</h1>
+                            <p className="text-lg opacity-90">Find your perfect life partner with verified, background-checked profiles</p>
+                            <div className="flex flex-wrap gap-4 mt-6">
+                                <div className="flex items-center gap-2">
+                                    <CheckCircle style={{width: '20px', height: '20px'}} />
+                                    <span>100% Verified Profiles</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <CheckCircle style={{width: '20px', height: '20px'}} />
+                                    <span>Background Checks</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <CheckCircle style={{width: '20px', height: '20px'}} />
+                                    <span>Admin Mediation</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <CheckCircle style={{width: '20px', height: '20px'}} />
+                                    <span>Privacy Protected</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div>
+                            <div className="flex items-center justify-between mb-6">
+                                <h2 className="text-2xl font-bold text-gray-900">Featured Profiles</h2>
+                                <span className="text-gray-600">{matrimonyProfiles.length} verified matches</span>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                {matrimonyProfiles.map(profile => (
+                                    <div key={profile.id} className="bg-white rounded-2xl shadow-lg overflow-hidden hover:shadow-2xl transition-all">
+                                        <div className="bg-gradient-to-br from-purple-100 to-pink-100 p-8 text-center relative">
+                                            <div className="text-6xl mb-4">{profile.photo}</div>
+                                            <div className="absolute top-4 right-4 bg-green-500 p-2 rounded-full">
+                                                <CheckCircle style={{width: '20px', height: '20px'}} className="text-white" />
+                                            </div>
+                                            <div className="absolute top-4 left-4">
+                                                <div className="flex items-center gap-1 bg-purple-600 bg-opacity-90 px-3 py-1 rounded-full">
+                                                    <Shield style={{width: '16px', height: '16px'}} className="text-white" />
+                                                    <span className="text-white font-bold text-sm">{profile.trustScore}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div className="p-6">
+                                            <div className="mb-4">
+                                                <h3 className="text-xl font-bold text-gray-900">{profile.name}</h3>
+                                                <p className="text-gray-600">{profile.age} years • {profile.maritalStatus}</p>
+                                            </div>
+
+                                            <div className="space-y-2 mb-4">
+                                                <div className="flex items-center gap-2 text-sm text-gray-700">
+                                                    <MapPin style={{width: '16px', height: '16px'}} className="text-gray-500" />
+                                                    <span>{profile.location}</span>
+                                                </div>
+                                                <div className="flex items-center gap-2 text-sm text-gray-700">
+                                                    <GraduationCap style={{width: '16px', height: '16px'}} className="text-gray-500" />
+                                                    <span>{profile.education}</span>
+                                                </div>
+                                                <div className="flex items-center gap-2 text-sm text-gray-700">
+                                                    <Briefcase style={{width: '16px', height: '16px'}} className="text-gray-500" />
+                                                    <span>{profile.profession}</span>
+                                                </div>
+                                            </div>
+
+                                            <p className="text-gray-600 text-sm mb-4 line-clamp-2">{profile.bio}</p>
+
+                                            <div className="flex flex-wrap gap-2 mb-4">
+                                                {profile.interests.slice(0, 3).map((interest, idx) => (
+                                                    <span key={idx} className="px-3 py-1 bg-purple-50 text-purple-600 rounded-full text-xs font-semibold">
+                                                        {interest}
+                                                    </span>
+                                                ))}
+                                            </div>
+
+                                            <div className="flex gap-2">
+                                                <button onClick={() => setSelectedProfile(profile)} className="flex-1 bg-gradient-to-r from-purple-600 to-pink-600 text-white py-3 rounded-lg font-semibold hover:opacity-90 transition flex items-center justify-center gap-2">
+                                                    <Heart style={{width: '16px', height: '16px'}} />
+                                                    Express Interest
+                                                </button>
+                                                <button onClick={() => setSelectedProfile(profile)} className="px-4 py-3 bg-gray-100 rounded-lg hover:bg-gray-200 transition">
+                                                    <Eye style={{width: '20px', height: '20px'}} className="text-gray-700" />
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        ReactDOM.render(<MatrimonyDashboard />, document.getElementById('root'));
+    </script>
+</body>
+</html>
