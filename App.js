@@ -18,9 +18,35 @@ const App = () => {
   useEffect(() => { checkSession(); }, []);
 
   const checkSession = async () => {
-    // Temporary bypass for development: go straight to Main
-    setInitialRoute('Main');
-    setLoading(false);
+    // Check if testing mode is enabled and we should skip auth
+    const testingMode = process.env.EXPO_PUBLIC_TESTING_MODE === 'true';
+    
+    if (testingMode) {
+      console.log('Testing mode enabled');
+      // In testing mode, we could auto-login, but for now keep the normal flow
+      // Users can use the test phone number to bypass OTP
+    }
+    
+    try {
+      // Check for existing session
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (session) {
+        // User is already logged in
+        console.log('Session found, navigating to Main');
+        setInitialRoute('Main');
+      } else {
+        // No session, go to auth
+        console.log('No session found, navigating to Auth');
+        setInitialRoute('Auth');
+      }
+    } catch (error) {
+      console.error('Session check error:', error);
+      // Fallback to auth on error
+      setInitialRoute('Auth');
+    } finally {
+      setLoading(false);
+    }
   };
 
   if (loading) return (

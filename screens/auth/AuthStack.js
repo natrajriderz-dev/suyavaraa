@@ -336,9 +336,108 @@ const LandingScreen = ({ navigation }) => {
       >
         <Text style={{ color: '#D97706', fontSize: 14, fontWeight: '700' }}>⚡ Dev Skip → Main App</Text>
       </TouchableOpacity>
+      
+      {/* Test Account Info */}
+      <View style={{ marginTop: 20, padding: 16, backgroundColor: '#1F2937', borderRadius: 12, borderWidth: 1, borderColor: '#374151' }}>
+        <Text style={{ color: '#9CA3AF', fontSize: 12, marginBottom: 8 }}>Test Account Info:</Text>
+        <Text style={{ color: '#D97706', fontSize: 12, fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace' }}>
+          Phone: {process.env.EXPO_PUBLIC_TEST_PHONE || '+919999999999'}
+        </Text>
+        <Text style={{ color: '#D97706', fontSize: 12, fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace', marginTop: 4 }}>
+          OTP: {process.env.EXPO_PUBLIC_TEST_OTP || '123456'}
+        </Text>
+        <Text style={{ color: '#9CA3AF', fontSize: 10, marginTop: 8 }}>
+          Testing Mode: {process.env.EXPO_PUBLIC_TESTING_MODE === 'true' ? 'ENABLED' : 'DISABLED'}
+        </Text>
+      </View>
+      
       <Text style={{ color: '#6B7280', fontSize: 11, marginTop: 8 }}>Remove before launch</Text>
     </View>
   );
+};
+
+// Helper function to create a complete test user profile
+const createTestUserProfile = async (user) => {
+  try {
+    // First, ensure the user exists in the users table
+    const { error: userError } = await supabase
+      .from('users')
+      .upsert({
+        id: user.id,
+        full_name: 'Test User',
+        date_of_birth: '1990-01-01',
+        gender: 'Other',
+        city: 'Test City',
+        profile_complete: true,
+        trust_level: 'verified',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        phone: user.phone,
+        email: user.email,
+      }, {
+        onConflict: 'id'
+      });
+
+    if (userError) {
+      console.error('Error creating user record:', userError);
+    }
+
+    // Create user profile with photos
+    const { error: profileError } = await supabase
+      .from('user_profiles')
+      .upsert({
+        user_id: user.id,
+        primary_photo_url: 'https://via.placeholder.com/400x400/FF9900/FFFFFF?text=Test+User',
+        bio: 'This is a test user account for development and testing purposes.',
+        occupation: 'Software Developer',
+        height_cm: 175,
+        education: 'Bachelor\'s Degree',
+        income_range: '$50,000 - $100,000',
+        looking_for: 'Serious Relationship',
+        marriage_timeline: 'Within 1 year',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      }, {
+        onConflict: 'user_id'
+      });
+
+    if (profileError) {
+      console.error('Error creating user profile:', profileError);
+    }
+
+    // Set user mode to dating
+    await AsyncStorage.setItem('userMode', 'dating');
+    await AsyncStorage.setItem('isPremium', 'true');
+    await AsyncStorage.setItem('trustLevel', 'verified');
+    
+    console.log('Test user profile created successfully');
+  } catch (error) {
+    console.error('Error in createTestUserProfile:', error);
+  }
+};
+
+// Helper function to ensure test user profile exists
+const ensureTestUserProfile = async (user) => {
+  try {
+    // Check if user exists in users table
+    const { data: existingUser, error: fetchError } = await supabase
+      .from('users')
+      .select('*')
+      .eq('id', user.id)
+      .single();
+
+    if (fetchError || !existingUser) {
+      // Create profile if it doesn't exist
+      await createTestUserProfile(user);
+    } else {
+      // Update AsyncStorage with existing data
+      await AsyncStorage.setItem('userMode', 'dating');
+      await AsyncStorage.setItem('isPremium', 'true');
+      await AsyncStorage.setItem('trustLevel', existingUser.trust_level || 'verified');
+    }
+  } catch (error) {
+    console.error('Error in ensureTestUserProfile:', error);
+  }
 };
 
 // Login Screen
@@ -360,9 +459,77 @@ const LoginScreen = ({ navigation }) => {
     setError('');
 
     try {
-      // Supabase call to send OTP
+      const fullPhoneNumber = `${countryCode}${phoneNumber}`;
+      
+      // Check for testing mode bypass
+      const testingMode = process.env.EXPO_PUBLIC_TESTING_MODE === 'true';
+      const testPhone = process.env.EXPO_PUBLIC_TEST_PHONE;
+      
+      if (testingMode && testPhone && fullPhoneNumber === testPhone) {
+        // Testing mode: skip OTP and auto-login with test user
+        console.log('Testing mode: Auto-login for test phone');
+        
+        // Create or sign in with test user
+        const testEmail = `test_${Date.now()}@example.com`;
+        const testPassword = 'testpassword123';
+        
+        // First try to sign in with test credentials
+        const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+          email: testEmail,
+          password: testPassword,
+        });
+        
+        if (signInError) {
+          // If sign in fails, create a new test user
+          console.log('Creating new test user');
+          const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+            email: testEmail,
+            password: testPassword,
+            phone: fullPhoneNumber,
+          });
+          
+          if (signUpError) throw signUpError;
+          
+          // Sign in with the newly created user
+          const { data: newSignInData, error: newSignInError } = await supabase.auth.signInWithPassword({
+            email: testEmail,
+            password: testPassword,
+          });
+          
+          if (newSignInError) throw newSignInError;
+          
+          // Get the user
+          const { data: { user } } = await supabase.auth.getUser();
+          if (!user) throw new Error('Failed to get test user');
+          
+          // Create complete test user profile in Supabase
+          await createTestUserProfile(user);
+          
+          // Store user data
+          await AsyncStorage.setItem('userToken', newSignInData.session.access_token);
+          await AsyncStorage.setItem('userData', JSON.stringify(user));
+          
+          Alert.alert('Test Login Successful', 'Logged in with test account');
+          navigation.replace('Main');
+          return;
+        }
+        
+        // If sign in succeeded, get user and ensure profile exists
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          await ensureTestUserProfile(user);
+          await AsyncStorage.setItem('userToken', signInData.session.access_token);
+          await AsyncStorage.setItem('userData', JSON.stringify(user));
+          
+          Alert.alert('Test Login Successful', 'Logged in with existing test account');
+          navigation.replace('Main');
+          return;
+        }
+      }
+      
+      // Normal OTP flow for non-test numbers
       const { data, error: signInError } = await supabase.auth.signInWithOtp({
-        phone: `${countryCode}${phoneNumber}`,
+        phone: fullPhoneNumber,
       });
 
       if (signInError) throw signInError;
@@ -387,8 +554,20 @@ const LoginScreen = ({ navigation }) => {
     setError('');
 
     try {
+      const fullPhoneNumber = `${countryCode}${phoneNumber}`;
+      
+      // Check for testing mode bypass OTP
+      const testingMode = process.env.EXPO_PUBLIC_TESTING_MODE === 'true';
+      const testPhone = process.env.EXPO_PUBLIC_TEST_PHONE;
+      const testOtp = process.env.EXPO_PUBLIC_TEST_OTP;
+      
+      if (testingMode && testPhone && fullPhoneNumber === testPhone && testOtp && otpString === testOtp) {
+        // Use test OTP to verify
+        console.log('Testing mode: Using test OTP');
+      }
+      
       const { data: { session, user }, error: verifyError } = await supabase.auth.verifyOtp({
-        phone: `${countryCode}${phoneNumber}`,
+        phone: fullPhoneNumber,
         token: otpString,
         type: 'sms'
       });
@@ -400,7 +579,6 @@ const LoginScreen = ({ navigation }) => {
         await AsyncStorage.setItem('userData', JSON.stringify(user));
 
         console.log('Login successful, navigating to main app');
-        // Let App.js redirect or handle navigation here
         navigation.replace('Main');
       }
     } catch (err) {
