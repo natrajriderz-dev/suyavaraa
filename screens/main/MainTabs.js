@@ -1,45 +1,124 @@
+// screens/main/MainTabs.js
 const React = require('react');
 const { createBottomTabNavigator } = require('@react-navigation/bottom-tabs');
-const { Text } = require('react-native');
-const AsyncStorage = require('@react-native-async-storage/async-storage').default.default;
-const { useState, useEffect } = React;
+const { Text, View, StyleSheet } = require('react-native');
+const { Ionicons } = require('@expo/vector-icons');
 
-const HomeScreen = require('./HomeScreen');
+const HomeStack = require('../src/screens/main/HomeStack');
 const ChatStack = require('./ChatStack');
 const ImpressScreen = require('./ImpressScreen');
-const TribesScreen = require('./TribesScreen');
+const TribesStack = require('./TribesScreen');
 const ProfileStack = require('./ProfileStack');
+const SuyamvaramScreen = require('../src/screens/main/SuyamvaramScreen');
+
+const { useMode } = require('../../context/ModeContext');
+const Colors = require('../../src/theme/Colors');
 
 const Tab = createBottomTabNavigator();
 
 const MainTabs = () => {
-  const [mode, setMode] = useState('dating');
-  useEffect(() => {
-    AsyncStorage.getItem('app_mode').then(m => { if (m) setMode(m); });
-  }, []);
+  const { userMode } = useMode();
+
+  // Branding Colors matching the guide
+  const activeColor = userMode === 'matrimony' ? '#D4A017' : '#E91E63'; // Goldish vs Pink
+  const inactiveColor = '#8E8E93';
 
   return (
     <Tab.Navigator
       screenOptions={{
         headerShown: false,
-        tabBarStyle: { backgroundColor: '#1E1E1E', borderTopColor: '#2D2D2D', paddingBottom: 4, height: 60 },
-        tabBarActiveTintColor: '#D97706',
-        tabBarInactiveTintColor: '#6B7280',
-        tabBarLabelStyle: { fontSize: 11, fontWeight: '600' },
+        tabBarStyle: { 
+          backgroundColor: '#ffffff', 
+          borderTopWidth: 0.5, 
+          borderTopColor: '#e5e5ea', 
+          height: 60,
+          paddingBottom: 8,
+          elevation: 8,
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: -2 },
+          shadowOpacity: 0.1,
+          shadowRadius: 4,
+        },
+        tabBarActiveTintColor: activeColor,
+        tabBarInactiveTintColor: inactiveColor,
+        tabBarLabelStyle: { fontSize: 10, fontWeight: '600', marginTop: -4 },
       }}
     >
-      <Tab.Screen name="Home" component={HomeScreen}
-        options={{ tabBarIcon: ({ focused }) => <Text style={{ fontSize: 20, opacity: focused ? 1 : 0.5 }}>🏠</Text> }} />
-      <Tab.Screen name="Chat" component={ChatStack}
-        options={{ tabBarLabel: 'Matches', tabBarIcon: ({ focused }) => <Text style={{ fontSize: 20, opacity: focused ? 1 : 0.5 }}>💬</Text> }} />
-      <Tab.Screen name="Impress" component={ImpressScreen}
-        options={{ tabBarLabel: mode === 'dating' ? 'IMPRESS' : 'Suyamvaram', tabBarIcon: ({ focused }) => <Text style={{ fontSize: 20, opacity: focused ? 1 : 0.5 }}>{mode === 'dating' ? '📸' : '🎭'}</Text> }} />
-      <Tab.Screen name="Tribes" component={TribesScreen}
-        options={{ tabBarLabel: mode === 'dating' ? 'Tribes' : 'Zones', tabBarIcon: ({ focused }) => <Text style={{ fontSize: 20, opacity: focused ? 1 : 0.5 }}>{mode === 'dating' ? '🏘️' : '🏛️'}</Text> }} />
-      <Tab.Screen name="Profile" component={ProfileStack}
-        options={{ tabBarIcon: ({ focused }) => <Text style={{ fontSize: 20, opacity: focused ? 1 : 0.5 }}>👤</Text> }} />
+      <Tab.Screen 
+        name="Home" 
+        component={HomeStack}
+        options={{ 
+          tabBarLabel: 'Home',
+          tabBarIcon: ({ color, size, focused }) => (
+            <Ionicons name={focused ? 'home' : 'home-outline'} size={24} color={color} />
+          )
+        }} 
+      />
+      
+      <Tab.Screen 
+        name="Discovery" 
+        component={TribesStack}
+        options={{ 
+          tabBarLabel: userMode === 'dating' ? 'Tribes' : 'Zones',
+          tabBarIcon: ({ color, size, focused }) => (
+            <Ionicons name={focused ? 'people' : 'people-outline'} size={24} color={color} />
+          )
+        }} 
+      />
+
+      {/* Special Feature Tab (Tab 3) */}
+      <Tab.Screen 
+        name="Feature" 
+        component={userMode === 'dating' ? ImpressScreen : SuyamvaramScreen}
+        options={{ 
+          tabBarLabel: userMode === 'dating' ? 'IMPRESS' : 'SUYAMVARAM',
+          tabBarIcon: ({ color, size, focused }) => (
+            <View style={[styles.specialTab, { backgroundColor: focused ? activeColor : inactiveColor + '20' }]}>
+              <Ionicons 
+                name={userMode === 'dating' ? 'flash' : 'ribbon'} 
+                size={22} 
+                color={focused ? '#fff' : color} 
+              />
+            </View>
+          ),
+          tabBarLabelStyle: { fontWeight: 'bold', color: activeColor }
+        }} 
+      />
+
+      <Tab.Screen 
+        name="Chat" 
+        component={ChatStack}
+        options={{ 
+          tabBarLabel: 'Matches', 
+          tabBarIcon: ({ color, size, focused }) => (
+            <Ionicons name={focused ? 'chatbubbles' : 'chatbubbles-outline'} size={24} color={color} />
+          )
+        }} 
+      />
+
+      <Tab.Screen 
+        name="ProfileTab" 
+        component={ProfileStack}
+        options={{ 
+          tabBarLabel: 'Profile',
+          tabBarIcon: ({ color, size, focused }) => (
+            <Ionicons name={focused ? 'person' : 'person-outline'} size={24} color={color} />
+          )
+        }} 
+      />
     </Tab.Navigator>
   );
 };
+
+const styles = StyleSheet.create({
+  specialTab: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 4,
+  }
+});
 
 module.exports = MainTabs;

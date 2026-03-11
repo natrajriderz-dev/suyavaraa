@@ -49,3 +49,4 @@ dist/
 *.log
 .DS_Store
 >>>>>>> ecf766d0e8c43ffde3e2e2828897e39afd1f66f6
+.aider*

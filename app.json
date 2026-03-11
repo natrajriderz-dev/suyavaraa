@@ -1,42 +1,24 @@
 {
   "expo": {
-<<<<<<< HEAD
     "name": "bond-app",
     "slug": "bond-app",
-=======
-    "name": "bond",
-    "slug": "bond",
->>>>>>> ecf766d0e8c43ffde3e2e2828897e39afd1f66f6
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
-<<<<<<< HEAD
-=======
-    "newArchEnabled": true,
->>>>>>> ecf766d0e8c43ffde3e2e2828897e39afd1f66f6
+    "userInterfaceStyle": "dark",
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#121212"
     },
     "ios": {
       "supportsTablet": true
     },
     "android": {
       "adaptiveIcon": {
-<<<<<<< HEAD
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/android-icon-foreground.png",
-        "backgroundImage": "./assets/android-icon-background.png",
-        "monochromeImage": "./assets/android-icon-monochrome.png"
-      }
-=======
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
-      },
-      "edgeToEdgeEnabled": true
->>>>>>> ecf766d0e8c43ffde3e2e2828897e39afd1f66f6
+        "backgroundColor": "#121212"
+      }
     },
     "web": {
       "favicon": "./assets/favicon.png"

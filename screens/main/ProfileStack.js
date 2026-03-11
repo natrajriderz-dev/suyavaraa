@@ -21,28 +21,36 @@ const AsyncStorage = require('@react-native-async-storage/async-storage').defaul
 const axios = require('axios');
 const ImagePicker = require('expo-image-picker');
 const { Ionicons } = require('@expo/vector-icons');
+const { LinearGradient } = require('expo-linear-gradient');
 
 const { width } = Dimensions.get('window');
+const { useMode } = require('../../context/ModeContext');
+const PremiumScreen = require('../../src/screens/main/PremiumScreen');
 const Stack = createStackNavigator();
 
 // Colors
-const colors = {
-  background: '#121212',
-  surface: '#1E1E1E',
-  surfaceLight: '#2D2D2D',
-  primary: '#D97706',
+const datingColors = {
+  background: '#ffffff',
+  surface: '#f9f9f9',
+  surfaceLight: '#f1f1f1',
+  primary: '#E91E63', // Pink
+  primaryLight: '#F06292',
+  text: '#1C1C1E',
+  textSecondary: '#6B7280',
+  textMuted: '#9CA3AF',
+  border: '#E5E5EA',
+};
+
+const matrimonyColors = {
+  background: '#ffffff',
+  surface: '#FFFAF0',
+  surfaceLight: '#FFF5E1',
+  primary: '#D97706', // Gold
   primaryLight: '#F59E0B',
-  text: '#FFFFFF',
-  textSecondary: '#9CA3AF',
-  textMuted: '#6B7280',
-  error: '#EF4444',
-  success: '#10B981',
-  border: '#2D2D2D',
-  gold: '#D97706',
-  goldLight: '#FBBF24',
-  trustHigh: '#10B981',
-  trustMedium: '#F59E0B',
-  trustLow: '#EF4444',
+  text: '#1C1C1E',
+  textSecondary: '#6B7280',
+  textMuted: '#9CA3AF',
+  border: '#E5E5EA',
 };
 
 // Styles
@@ -193,6 +201,48 @@ const styles = StyleSheet.create({
   },
   premiumText: {
     color: colors.gold,
+  },
+  premiumBadge: {
+    backgroundColor: '#D97706' + '20',
+    borderColor: '#D97706',
+  },
+  premiumText: {
+    color: '#D97706',
+    fontWeight: 'bold',
+  },
+  // Premium Banner
+  premiumBanner: {
+    padding: 2,
+    borderRadius: 20,
+    marginVertical: 16,
+    overflow: 'hidden',
+  },
+  premiumBannerInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    borderRadius: 18,
+  },
+  premiumIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16,
+  },
+  premiumBannerTextContainer: {
+    flex: 1,
+  },
+  premiumBannerTitle: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  premiumBannerSubtitle: {
+    color: 'rgba(255,255,255,0.8)',
+    fontSize: 13,
   },
   // Trust Score
   trustScoreContainer: {
@@ -502,17 +552,123 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginHorizontal: 6,
   },
-  modalButtonCancel: {
-    backgroundColor: colors.surfaceLight,
-  },
-  modalButtonConfirm: {
-    backgroundColor: colors.error,
-  },
   modalButtonText: {
     fontSize: 16,
     fontWeight: '600',
   },
+  // Account Switcher Styles
+  switchContainer: { padding: 20, width: '100%' },
+  switchAccountItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    borderRadius: 16,
+    marginBottom: 12,
+    borderWidth: 2,
+  },
+  switchAccountInfo: { flex: 1, marginLeft: 16 },
+  switchAccountName: { fontSize: 16, fontWeight: 'bold' },
+  switchAccountMode: { fontSize: 12 },
+  premiumLock: { 
+    position: 'absolute', 
+    top: 10, 
+    right: 10,
+    backgroundColor: '#00000010',
+    padding: 4,
+    borderRadius: 8
+  },
 });
+
+const AccountSwitcher = ({ visible, onClose, currentMode, onSwitch, isPremium }) => {
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={onClose}>
+        <View style={[styles.modalContent, { paddingBottom: 40 }]}>
+          <View style={{ width: 40, height: 4, backgroundColor: '#ccc', borderRadius: 2, alignSelf: 'center', marginBottom: 20 }} />
+          <Text style={styles.modalTitle}>Switch Experience</Text>
+          
+          <View style={styles.switchContainer}>
+            {/* Dating Option */}
+            <TouchableOpacity 
+              style={[
+                styles.switchAccountItem, 
+                { 
+                  borderColor: currentMode === 'dating' ? datingColors.primary : '#eee',
+                  backgroundColor: currentMode === 'dating' ? datingColors.primary + '10' : '#fff'
+                }
+              ]}
+              onPress={() => onSwitch('dating')}
+            >
+              <View style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: datingColors.primary + '20', justifyContent: 'center', alignItems: 'center' }}>
+                <Text style={{ fontSize: 24 }}>💕</Text>
+              </View>
+              <View style={styles.switchAccountInfo}>
+                <Text style={[styles.switchAccountName, { color: datingColors.primary }]}>Dating Mode</Text>
+                <Text style={styles.switchAccountMode}>Casual, Fun & Social</Text>
+              </View>
+              {currentMode === 'dating' && <Ionicons name="checkmark-circle" size={24} color={datingColors.primary} />}
+            </TouchableOpacity>
+
+            {/* Matrimony Option */}
+            <TouchableOpacity 
+              style={[
+                styles.switchAccountItem, 
+                { 
+                  borderColor: currentMode === 'matrimony' ? matrimonyColors.primary : '#eee',
+                  backgroundColor: currentMode === 'matrimony' ? matrimonyColors.primary + '10' : '#fff',
+                  opacity: !isPremium && currentMode === 'dating' ? 0.6 : 1
+                }
+              ]}
+              onPress={() => onSwitch('matrimony')}
+            >
+              <View style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: matrimonyColors.primary + '20', justifyContent: 'center', alignItems: 'center' }}>
+                <Text style={{ fontSize: 24 }}>💍</Text>
+              </View>
+              <View style={styles.switchAccountInfo}>
+                <Text style={[styles.switchAccountName, { color: matrimonyColors.primary }]}>Matrimony Mode</Text>
+                <Text style={styles.switchAccountMode}>Serious & Tradition-focused</Text>
+              </View>
+              {currentMode === 'matrimony' && <Ionicons name="checkmark-circle" size={24} color={matrimonyColors.primary} />}
+              {!isPremium && currentMode === 'dating' && (
+                <View style={styles.premiumLock}>
+                  <Ionicons name="lock-closed" size={14} color="#666" />
+                </View>
+              )}
+            </TouchableOpacity>
+          </View>
+
+          {!isPremium && (
+            <TouchableOpacity style={{ marginTop: 10, alignSelf: 'center' }} onPress={() => { onClose(); }}>
+              <Text style={{ color: matrimonyColors.primary, fontWeight: 'bold' }}>Premium users only can switch modes</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      </TouchableOpacity>
+    </Modal>
+  );
+};
+
+const PremiumBanner = ({ onPress }) => {
+  return (
+    <TouchableOpacity onPress={onPress} activeOpacity={0.9}>
+      <LinearGradient
+        colors={['#D97706', '#F59E0B']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.premiumBannerInner}
+      >
+        <View style={styles.premiumIconContainer}>
+          <Ionicons name="star" size={24} color="#fff" />
+        </View>
+        <View style={styles.premiumBannerTextContainer}>
+          <Text style={styles.premiumBannerTitle}>Unlock Everything</Text>
+          <Text style={styles.premiumBannerSubtitle}>Get Premium for both modes & more</Text>
+        </View>
+        <Ionicons name="chevron-forward" size={20} color="#fff" />
+      </LinearGradient>
+    </TouchableOpacity>
+  );
+};
 
 // Fish Trap Profile Screen (for unverified users)
 const FishTrapProfileScreen = ({ navigation }) => {
@@ -538,7 +694,7 @@ const FishTrapProfileScreen = ({ navigation }) => {
 // Profile Screen Component
 const ProfileScreen = ({ navigation }) => {
   const [profile, setProfile] = useState(null);
-  const [userMode, setUserMode] = useState('dating');
+  const { userMode, toggleMode } = useMode();
   const [isPremium, setIsPremium] = useState(false);
   const [trustLevel, setTrustLevel] = useState('unverified');
   const [loading, setLoading] = useState(true);
@@ -550,12 +706,11 @@ const ProfileScreen = ({ navigation }) => {
 
   useEffect(() => {
     loadProfile();
-  }, []);
+  }, [userMode]);
 
   const loadProfile = async () => {
     try {
       const userData = await AsyncStorage.getItem('userData');
-      const mode = await AsyncStorage.getItem('userMode');
       const premium = await AsyncStorage.getItem('isPremium') === 'true';
       const trust = await AsyncStorage.getItem('trustLevel') || 'unverified';
       
@@ -563,7 +718,6 @@ const ProfileScreen = ({ navigation }) => {
         setProfile(JSON.parse(userData));
       }
       
-      setUserMode(mode || 'dating');
       setIsPremium(premium);
       setTrustLevel(trust);
 
@@ -585,24 +739,32 @@ const ProfileScreen = ({ navigation }) => {
     }
   };
 
-  const handleSwitchMode = () => {
-    const newMode = userMode === 'dating' ? 'matrimony' : 'dating';
-    Alert.alert(
-      'Switch Mode',
-      `Switch to ${newMode === 'dating' ? 'Dating' : 'Matrimony'} mode?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Switch',
-          onPress: async () => {
-            await AsyncStorage.setItem('userMode', newMode);
-            setUserMode(newMode);
-            Alert.alert('Success', `Switched to ${newMode} mode`);
-          }
-        }
-      ]
-    );
+  const [showSwitcher, setShowSwitcher] = useState(false);
+  const colors = userMode === 'matrimony' ? matrimonyColors : datingColors;
+
+  const handleSwitchMode = (targetMode) => {
+    if (targetMode === userMode) {
+      setShowSwitcher(false);
+      return;
+    }
+
+    if (!isPremium) {
+      Alert.alert(
+        'Premium Required',
+        'Switching between Dating and Matrimony modes is a Premium feature. Upgrade now to access both experiences.',
+        [
+          { text: 'Later', style: 'cancel' },
+          { text: 'Upgrade Now', onPress: () => navigation.navigate('Premium') }
+        ]
+      );
+      return;
+    }
+
+    switchMode(targetMode);
+    setShowSwitcher(false);
+    Alert.alert('Success', `Switched to ${targetMode === 'dating' ? 'Dating' : 'Matrimony'} mode`);
   };
+
 
   const getTrustScoreColor = (score) => {
     if (score >= 80) return colors.trustHigh;
@@ -624,8 +786,15 @@ const ProfileScreen = ({ navigation }) => {
   }
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <AccountSwitcher 
+        visible={showSwitcher}
+        onClose={() => setShowSwitcher(false)}
+        currentMode={userMode}
+        onSwitch={handleSwitchMode}
+        isPremium={isPremium}
+      />
+      <View style={[styles.header, { borderBottomColor: colors.border }]}>
         <Text style={styles.headerTitle}>Profile</Text>
         <TouchableOpacity 
           style={styles.headerIcon}
@@ -665,6 +834,10 @@ const ProfileScreen = ({ navigation }) => {
               {profile?.city || 'Location not set'}
             </Text>
           </View>
+
+          {!isPremium && (
+            <PremiumBanner onPress={() => navigation.navigate('Premium')} />
+          )}
 
           {/* Badges */}
           <View style={styles.badgesContainer}>
@@ -751,26 +924,17 @@ const ProfileScreen = ({ navigation }) => {
           </TouchableOpacity>
 
           <TouchableOpacity 
-            style={styles.actionButton}
-            onPress={handleSwitchMode}
+            style={[styles.actionButton, { backgroundColor: colors.surface, borderColor: colors.border }]}
+            onPress={() => setShowSwitcher(true)}
           >
-            <Ionicons name="swap-horizontal" size={20} color={colors.text} />
-            <Text style={styles.actionButtonText}>
-              Switch to {userMode === 'dating' ? 'Matrimony' : 'Dating'} Mode
+            <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: colors.primary + '20', justifyContent: 'center', alignItems: 'center' }}>
+              <Text>{userMode === 'dating' ? '💘' : '💍'}</Text>
+            </View>
+            <Text style={[styles.actionButtonText, { color: colors.text }]}>
+              Switch Mode (Current: {userMode === 'dating' ? 'Dating' : 'Matrimony'})
             </Text>
+            <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} style={{ marginLeft: 'auto', marginRight: 10 }} />
           </TouchableOpacity>
-
-          {!isPremium && (
-            <TouchableOpacity 
-              style={[styles.actionButton, { borderColor: colors.gold }]}
-              onPress={() => navigation.navigate('Premium')}
-            >
-              <Text>⭐</Text>
-              <Text style={[styles.actionButtonText, { color: colors.gold }]}>
-                Upgrade to Premium
-              </Text>
-            </TouchableOpacity>
-          )}
         </View>
       </ScrollView>
     </View>
@@ -1225,6 +1389,7 @@ const ProfileStack = () => {
       <Stack.Screen name="Profile" component={ProfileScreen} />
       <Stack.Screen name="EditProfile" component={EditProfileScreen} />
       <Stack.Screen name="Settings" component={SettingsScreen} />
+      <Stack.Screen name="Premium" component={PremiumScreen} />
       <Stack.Screen name="FishTrap" component={FishTrapProfileScreen} />
     </Stack.Navigator>
   );
