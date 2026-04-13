@@ -15,7 +15,9 @@
       "bundleIdentifier": "com.trusthub.suyavaraa",
       "supportsTablet": true,
       "infoPlist": {
-        "UIBackgroundModes": ["remote-notification"],
+        "UIBackgroundModes": [
+          "remote-notification"
+        ],
         "NSUserNotificationsUsageDescription": "This app uses notifications to alert you about new matches, messages, and important updates."
       }
     },
@@ -36,7 +38,7 @@
     },
     "extra": {
       "eas": {
-        "projectId": "YOUR_EAS_PROJECT_ID_HERE"
+        "projectId": "9d03b1ff-0a7c-45a0-ae70-01d4dfe84719"
       }
     }
   }

@@ -105,6 +105,13 @@ const compressImage = async (uri) => {
   }
 };
 
+const autoCompressMedia = async (uri, mimeType) => {
+  if (Platform.OS !== 'web' && mimeType.startsWith('image/')) {
+    return compressImage(uri);
+  }
+  return uri;
+};
+
 /**
  * Uploads media to Supabase Storage
  */
@@ -115,16 +122,21 @@ const uploadMedia = async (uri, bucket, path) => {
     const mimeType = `image/${ext === 'jpg' ? 'jpeg' : ext}`;
 
     let fileData;
+    let uploadUri = uri;
+
+    if (mimeType.startsWith('image/')) {
+      uploadUri = await autoCompressMedia(uri, mimeType);
+    }
 
     if (Platform.OS === 'web') {
       // For web: uri is a DataURL (base64)
       // Convert DataURL to Blob
-      const response = await fetch(uri);
+      const response = await fetch(uploadUri);
       fileData = await response.blob();
     } else {
       // For native: Read file as base64
       const FileSystem = require('expo-file-system').default;
-      const base64 = await FileSystem.readAsStringAsync(uri, {
+      const base64 = await FileSystem.readAsStringAsync(uploadUri, {
         encoding: FileSystem.EncodingType.Base64,
       });
       fileData = Buffer.from(base64, 'base64');
@@ -139,7 +151,14 @@ const uploadMedia = async (uri, bucket, path) => {
         upsert: true
       });
 
-    if (error) throw error;
+    if (error) {
+      const errorText = error.message?.toLowerCase() || '';
+      const bucketMissing = errorText.includes('bucket') && (errorText.includes('not found') || errorText.includes('does not exist') || errorText.includes('not exist'));
+      const message = bucketMissing
+        ? `Supabase storage bucket "${bucket}" is missing. Create this bucket in Supabase Storage and retry.`
+        : error.message || 'Photo upload failed';
+      throw new Error(message);
+    }
 
     const { data: { publicUrl } } = supabase.storage
       .from(bucket)
@@ -148,7 +167,7 @@ const uploadMedia = async (uri, bucket, path) => {
     return publicUrl;
   } catch (error) {
     console.error('Upload Error:', error);
-    return null;
+    throw error;
   }
 };
 

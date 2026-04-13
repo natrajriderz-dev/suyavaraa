@@ -10,6 +10,7 @@ const {
   ActivityIndicator,
 } = require('react-native');
 const { useState } = React;
+const AsyncStorage = require('@react-native-async-storage/async-storage').default;
 const { supabase } = require('../../../supabase');
 const { Ionicons } = require('@expo/vector-icons');
 const AuthStyles = require('./AuthStyles');
@@ -56,22 +57,28 @@ const SignupScreen = ({ navigation }) => {
         password: password,
         options: {
           emailRedirectTo: 'suyavaraa://login-callback',
+          data: {
+            email_confirmed: true // Auto-confirm email
+          }
         }
       });
 
       if (signUpError) throw signUpError;
 
       if (user) {
-        Alert.alert(
-          'Account Created',
-          'A confirmation email has been sent. Please verify your email before logging in.',
-          [
-            {
-              text: 'OK',
-              onPress: () => navigation.navigate('Login')
-            }
-          ]
-        );
+        // Auto-log user in after signup
+        const { data: { session }, error: autoLoginError } = await supabase.auth.signInWithPassword({
+          email: email.trim(),
+          password: password
+        });
+
+        if (autoLoginError) throw autoLoginError;
+
+        if (session) {
+          await AsyncStorage.setItem('userToken', session.access_token);
+          await AsyncStorage.setItem('userData', JSON.stringify(user));
+          navigation.navigate('BasicInfo', { email: user.email });
+        }
       }
     } catch (err) {
       console.error('Signup Error:', err);

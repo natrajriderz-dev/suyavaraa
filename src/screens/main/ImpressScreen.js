@@ -165,7 +165,7 @@ const ImpressScreen = ({ navigation }) => {
       setShowCreateModal(false);
     } catch (error) {
       console.error('Create post error:', error.message);
-      Alert.alert('Error', 'Failed to create post');
+      Alert.alert('Error', error.message || 'Failed to create post');
       throw error; // Re-throw for modal to handle loading state
     }
   };

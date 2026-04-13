@@ -69,7 +69,10 @@ const VideoVerificationScreen = ({ navigation }) => {
 
     } catch (error) {
       console.error('Upload error:', error);
-      Alert.alert('Upload Error', 'Failed to submit verification. Please try again.');
+      const message = error.message?.includes('bucket')
+        ? error.message
+        : 'Failed to submit verification. Please try again.';
+      Alert.alert('Upload Error', message);
     } finally {
       setLoading(false);
     }

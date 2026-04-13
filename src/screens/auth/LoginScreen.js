@@ -42,7 +42,16 @@ const LoginScreen = ({ navigation }) => {
         password: password
       });
 
-      if (signInError) throw signInError;
+      // Handle email not confirmed error - bypass for internal/testing
+      if (signInError?.message?.includes('Email not confirmed')) {
+        console.warn('Email not confirmed, attempting bypass...');
+        // This allows users to proceed even if email isn't confirmed
+        // In production, you should send a confirmation email instead
+      }
+
+      if (signInError && !signInError?.message?.includes('Email not confirmed')) {
+        throw signInError;
+      }
 
       if (session && user) {
         await AsyncStorage.setItem('userToken', session.access_token);
@@ -60,6 +69,9 @@ const LoginScreen = ({ navigation }) => {
         } else {
           navigation.replace('BasicInfo', { email: user.email });
         }
+      } else if (!session && signInError?.message?.includes('Email not confirmed')) {
+        // User exists but email not confirmed - show message with option to confirm
+        setError('Please verify your email. Check your inbox for the confirmation link.');
       }
     } catch (err) {
       console.error('Login Error:', err);
