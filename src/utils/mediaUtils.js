@@ -117,6 +117,8 @@ const autoCompressMedia = async (uri, mimeType) => {
  */
 const uploadMedia = async (uri, bucket, path) => {
   try {
+    console.log(`📤 Starting upload to bucket: ${bucket}, path: ${path}`);
+    
     const fileName = path.split('/').pop();
     const ext = fileName.split('.').pop().toLowerCase();
     const mimeType = `image/${ext === 'jpg' ? 'jpeg' : ext}`;
@@ -125,23 +127,51 @@ const uploadMedia = async (uri, bucket, path) => {
     let uploadUri = uri;
 
     if (mimeType.startsWith('image/')) {
+      console.log('🖼️ Compressing image...');
       uploadUri = await autoCompressMedia(uri, mimeType);
     }
 
     if (Platform.OS === 'web') {
       // For web: uri is a DataURL (base64)
-      // Convert DataURL to Blob
+      console.log('🌐 Web platform detected');
       const response = await fetch(uploadUri);
       fileData = await response.blob();
     } else {
-      // For native: Read file as base64
-      const FileSystem = require('expo-file-system').default;
-      const base64 = await FileSystem.readAsStringAsync(uploadUri, {
-        encoding: FileSystem.EncodingType.Base64,
-      });
-      fileData = Buffer.from(base64, 'base64');
+      // For native: Use fetch to get the file as blob
+      console.log('📱 Native platform detected');
+      try {
+        // Method 1: Try using fetch for the file URI
+        const response = await fetch(uploadUri);
+        fileData = await response.blob();
+        console.log('✅ File loaded via fetch');
+      } catch (fetchError) {
+        console.log('⚠️ Fetch failed, trying FileSystem:', fetchError.message);
+        // Method 2: Use FileSystem as fallback
+        const FileSystem = require('expo-file-system').default;
+        const fileInfo = await FileSystem.getInfoAsync(uploadUri);
+        
+        if (!fileInfo.exists) {
+          throw new Error(`File not found: ${uploadUri}`);
+        }
+        
+        // Read file as base64
+        const base64 = await FileSystem.readAsStringAsync(uploadUri, {
+          encoding: FileSystem.EncodingType.Base64,
+        });
+        
+        // Convert base64 to ArrayBuffer
+        const binaryString = atob(base64);
+        const bytes = new Uint8Array(binaryString.length);
+        for (let i = 0; i < binaryString.length; i++) {
+          bytes[i] = binaryString.charCodeAt(i);
+        }
+        fileData = bytes.buffer;
+        console.log('✅ File loaded via FileSystem');
+      }
     }
 
+    console.log(`📤 Uploading ${fileData.size} bytes to ${bucket}...`);
+    
     // Upload to Supabase
     const { data, error } = await supabase.storage
       .from(bucket)
@@ -152,21 +182,32 @@ const uploadMedia = async (uri, bucket, path) => {
       });
 
     if (error) {
+      console.error('❌ Upload error:', error);
       const errorText = error.message?.toLowerCase() || '';
       const bucketMissing = errorText.includes('bucket') && (errorText.includes('not found') || errorText.includes('does not exist') || errorText.includes('not exist'));
-      const message = bucketMissing
-        ? `Supabase storage bucket "${bucket}" is missing. Create this bucket in Supabase Storage and retry.`
-        : error.message || 'Photo upload failed';
+      const permissionDenied = errorText.includes('permission denied') || errorText.includes('not authorized');
+      
+      let message = error.message || 'Photo upload failed';
+      
+      if (bucketMissing) {
+        message = `Supabase storage bucket "${bucket}" is missing. Create this bucket in Supabase Storage and retry.`;
+      } else if (permissionDenied) {
+        message = `Permission denied for bucket "${bucket}". Check RLS policies or bucket permissions.`;
+      }
+      
       throw new Error(message);
     }
 
+    console.log('✅ Upload successful!');
+    
     const { data: { publicUrl } } = supabase.storage
       .from(bucket)
       .getPublicUrl(path);
 
+    console.log(`🔗 Public URL: ${publicUrl}`);
     return publicUrl;
   } catch (error) {
-    console.error('Upload Error:', error);
+    console.error('💥 Upload Error:', error);
     throw error;
   }
 };

@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Check Supabase Storage Buckets</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            border-bottom: 2px solid #3ecf8e;
+            padding-bottom: 10px;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #555;
+        }
+        input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+            box-sizing: border-box;
+        }
+        button {
+            background: #3ecf8e;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: background 0.3s;
+        }
+        button:hover {
+            background: #2dbd7d;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 5px;
+            display: none;
+        }
+        .success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .loading {
+            text-align: center;
+            padding: 20px;
+        }
+        .bucket-list {
+            margin-top: 20px;
+        }
+        .bucket-item {
+            padding: 10px;
+            margin: 5px 0;
+            background: #f8f9fa;
+            border-radius: 5px;
+            border-left: 4px solid #3ecf8e;
+        }
+        .bucket-missing {
+            border-left-color: #dc3545;
+            background: #fff5f5;
+        }
+        .bucket-name {
+            font-weight: bold;
+        }
+        .bucket-status {
+            float: right;
+            padding: 2px 8px;
+            border-radius: 3px;
+            font-size: 12px;
+        }
+        .status-public {
+            background: #d4edda;
+            color: #155724;
+        }
+        .status-private {
+            background: #fff3cd;
+            color: #856404;
+        }
+        .status-missing {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        .instructions {
+            background: #e7f3ff;
+            padding: 15px;
+            border-radius: 5px;
+            margin-top: 20px;
+            border-left: 4px solid #007bff;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Check Supabase Storage Buckets</h1>
+        
+        <div class="form-group">
+            <label for="supabaseUrl">Supabase Project URL:</label>
+            <input type="text" id="supabaseUrl" value="https://mocbhyhccwwbczcqcdwb.supabase.co" placeholder="https://your-project.supabase.co">
+        </div>
+        
+        <div class="form-group">
+            <label for="anonKey">Supabase Anon/Public Key:</label>
+            <input type="text" id="anonKey" value="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1vY2JoeWhjY3d3YmN6Y3FjZHdiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE3Nzc1OTgsImV4cCI6MjA4NzM1MzU5OH0.Xzo9Yv29oTdjWyqnfedQAfh4vUYxSOVKLF5cKjsYZuk" placeholder="eyJ...">
+        </div>
+        
+        <button id="checkBtn" onclick="checkBuckets()">Check Storage Buckets</button>
+        
+        <div id="loading" class="loading" style="display: none;">
+            <p>Checking Supabase storage buckets...</p>
+        </div>
+        
+        <div id="result" class="result"></div>
+        
+        <div id="bucketList" class="bucket-list"></div>
+        
+        <div class="instructions">
+            <h3>Required Buckets for Suyavaraa App:</h3>
+            <ul>
+                <li><strong>avatars</strong> - For user profile photos (should be public)</li>
+                <li><strong>posts</strong> - For social media posts (should be public)</li>
+                <li><strong>verification_media</strong> - For video verification (can be private)</li>
+            </ul>
+            <p><strong>How to create missing buckets:</strong></p>
+            <ol>
+                <li>Go to your Supabase Dashboard</li>
+                <li>Click on "Storage" in the left menu</li>
+                <li>Click "Create new bucket"</li>
+                <li>Enter the bucket name exactly as shown above</li>
+                <li>Set to "Public" for avatars and posts</li>
+                <li>Click "Create bucket"</li>
+            </ol>
+        </div>
+    </div>
+
+    <script>
+        async function checkBuckets() {
+            const supabaseUrl = document.getElementById('supabaseUrl').value.trim();
+            const anonKey = document.getElementById('anonKey').value.trim();
+            
+            if (!supabaseUrl || !anonKey) {
+                alert('Please enter both Supabase URL and Anon Key');
+                return;
+            }
+            
+            const checkBtn = document.getElementById('checkBtn');
+            const loading = document.getElementById('loading');
+            const result = document.getElementById('result');
+            const bucketList = document.getElementById('bucketList');
+            
+            checkBtn.disabled = true;
+            loading.style.display = 'block';
+            result.style.display = 'none';
+            bucketList.innerHTML = '';
+            
+            try {
+                // Test connection by listing buckets
+                const response = await fetch(`${supabaseUrl}/storage/v1/bucket`, {
+                    headers: {
+                        'Authorization': `Bearer ${anonKey}`,
+                        'apikey': anonKey
+                    }
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const buckets = await response.json();
+                
+                // Display results
+                loading.style.display = 'none';
+                result.className = 'result success';
+                result.innerHTML = `<strong>✅ Connection Successful!</strong><br>Found ${buckets.length} bucket(s)`;
+                result.style.display = 'block';
+                
+                // Check required buckets
+                const requiredBuckets = ['avatars', 'posts', 'verification_media'];
+                const existingBuckets = buckets.map(b => b.name);
+                
+                let html = '<h3>Bucket Status:</h3>';
+                
+                requiredBuckets.forEach(bucketName => {
+                    const bucket = buckets.find(b => b.name === bucketName);
+                    const exists = bucket !== undefined;
+                    
+                    html += `<div class="bucket-item ${exists ? '' : 'bucket-missing'}">`;
+                    html += `<span class="bucket-name">${bucketName}</span>`;
+                    
+                    if (exists) {
+                        html += `<span class="bucket-status status-${bucket.public ? 'public' : 'private'}">`;
+                        html += `${bucket.public ? 'PUBLIC' : 'PRIVATE'}`;
+                        html += `</span>`;
+                        html += `<br><small>Created: ${new Date(bucket.created_at).toLocaleDateString()}</small>`;
+                    } else {
+                        html += `<span class="bucket-status status-missing">MISSING</span>`;
+                        html += `<br><small>This bucket needs to be created</small>`;
+                    }
+                    
+                    html += `</div>`;
+                });
+                
+                // Show existing non-required buckets
+                const otherBuckets = buckets.filter(b => !requiredBuckets.includes(b.name));
+                if (otherBuckets.length > 0) {
+                    html += '<h3>Other Buckets:</h3>';
+                    otherBuckets.forEach(bucket => {
+                        html += `<div class="bucket-item">`;
+                        html += `<span class="bucket-name">${bucket.name}</span>`;
+                        html += `<span class="bucket-status status-${bucket.public ? 'public' : 'private'}">`;
+                        html += `${bucket.public ? 'PUBLIC' : 'PRIVATE'}`;
+                        html += `</span>`;
+                        html += `</div>`;
+                    });
+                }
+                
+                bucketList.innerHTML = html;
+                
+                // Test upload if all buckets exist
+                const allBucketsExist = requiredBuckets.every(b => existingBuckets.includes(b));
+                if (allBucketsExist) {
+                    setTimeout(() => testUpload(supabaseUrl, anonKey), 1000);
+                }
+                
+            } catch (error) {
+                loading.style.display = 'none';
+                result.className = 'result error';
+                result.innerHTML = `<strong>❌ Error:</strong><br>${error.message}`;
+                result.style.display = 'block';
+                console.error('Error:', error);
+            } finally {
+                checkBtn.disabled = false;
+            }
+        }
+        
+        async function testUpload(supabaseUrl, anonKey) {
+            const result = document.getElementById('result');
+            const oldResult = result.innerHTML;
+            
+            result.innerHTML = oldResult + '<br><br>Testing upload to avatars bucket...';
+            
+            try {
+                // Create a simple test image (1x1 pixel PNG)
+                const testImage = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
+                const blob = new Blob([Uint8Array.from(atob(testImage), c => c.charCodeAt(0))], { type: 'image/png' });
+                
+                const testFileName = `test_${Date.now()}.png`;
+                const formData = new FormData();
+                formData.append('file', blob, testFileName);
+                
+                const uploadResponse = await fetch(`${supabaseUrl}/storage/v1/object/avatars/${testFileName}`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${anonKey}`,
+                        'apikey': anonKey
+                    },
+                    body: formData
+                });
+                
+                if (!uploadResponse.ok) {
+                    const errorText = await uploadResponse.text();
+                    throw new Error(`Upload failed: ${uploadResponse.status} - ${errorText}`);
+                }
+                
+                result.innerHTML = oldResult + '<br><br>✅ Upload test successful! Storage is working correctly.';
+                
+                // Clean up test file
+                setTimeout(async () => {
+                    try {
+                        await fetch(`${supabaseUrl}/storage/v1/object/avatars/${testFileName}`, {
+                            method: 'DELETE',
+                            headers: {
+                                'Authorization': `Bearer ${anonKey}`,
+                                'apikey': anonKey
+                            }
+                        });
+                    } catch (e) {
+                        console.log('Cleanup failed (not critical):', e.message);
+                    }
+                }, 3000);
+                
+            } catch (error) {
+                result.innerHTML = oldResult + `<br><br>⚠️ Upload test failed: ${error.message}`;
+                console.error('Upload test error:', error);
+            }
+        }
+        
+        // Auto-check on page load if URL and key are filled
+        window.addEventListener('load', () => {
+            const url = document.getElementById('supabaseUrl').value;
+            const key = document.getElementById('anonKey').value;
+            if (url && key && url.includes('supabase.co')) {
+                setTimeout(() => checkBuckets(), 1000);
+            }
+        });
+    </script>
+</body>
+</html>
