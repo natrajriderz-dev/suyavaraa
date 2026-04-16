@@ -112,21 +112,30 @@ const ImpressScreen = ({ navigation }) => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
-      // 1. Content Moderation Check
-      const modResult = await moderationService.screenText(postData.caption, user.id);
-      if (!modResult.safe) {
-        Alert.alert('Content Blocked', `Your post contains ${modResult.reason}. Please revise your caption.`);
-        return;
-      }
-
-      const captionToUse = modResult.scrubbed || postData.caption;
-
       let mediaUrls = [];
       if (postData.photo) {
         const fileName = `post_${user.id}_${Date.now()}.jpg`;
         const uploadedUrl = await uploadMedia(postData.photo.uri, 'posts', fileName);
         if (uploadedUrl) mediaUrls = [uploadedUrl];
       }
+
+      // 1. Content Moderation Check (text + visual deepfake/sexual scan)
+      const modResult = await moderationService.moderatePost(user.id, postData.caption, mediaUrls);
+      if (!modResult.safe) {
+        // Create a report for admin visibility if it's severe
+        await moderationService.reportContent(
+          user.id,
+          user.id,
+          'post',
+          null,
+          `[AUTO] ${modResult.category || 'policy_violation'}: ${modResult.reason}`
+        );
+
+        Alert.alert('Content Blocked', `Your post violates policy: ${modResult.reason}. Please revise and try again.`);
+        return;
+      }
+
+      const captionToUse = postData.caption;
 
       const { data: insertedPost, error } = await supabase
         .from('posts')

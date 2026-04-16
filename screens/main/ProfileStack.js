@@ -23,6 +23,10 @@ const axios = require('axios');
 const ImagePicker = require('expo-image-picker');
 const { Ionicons } = require('@expo/vector-icons');
 const { LinearGradient } = require('expo-linear-gradient');
+const { supabase } = require('../../supabase');
+const { uploadMedia } = require('../../src/utils/mediaUtils');
+const moderationService = require('../../src/services/moderationService');
+const deepfakeDetectionService = require('../../src/services/deepfakeDetectionService');
 
 const { width } = Dimensions.get('window');
 const { useMode } = require('../../context/ModeContext');
@@ -699,11 +703,11 @@ const FishTrapProfileScreen = ({ navigation }) => {
 // Profile Screen Component
 const ProfileScreen = ({ navigation }) => {
   const [profile, setProfile] = useState(null);
-  const { userMode, toggleMode } = useMode();
+  const { userMode, switchMode } = useMode();
   const [isPremium, setIsPremium] = useState(false);
   const [trustLevel, setTrustLevel] = useState('unverified');
   const [loading, setLoading] = useState(true);
-  const [stats, setStats] = useState({
+  const [stats, setStats] = {
     matches: 0,
     likes: 0,
     views: 0
@@ -715,30 +719,73 @@ const ProfileScreen = ({ navigation }) => {
 
   const loadProfile = async () => {
     try {
-      const userData = await AsyncStorage.getItem('userData');
-      const premium = await AsyncStorage.getItem('isPremium') === 'true';
-      const trust = await AsyncStorage.getItem('trustLevel') || 'unverified';
-      
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      // Load user row + profile row
+      const { data: userData } = await supabase
+        .from('users')
+        .select('id, full_name, city, bio, is_premium, premium_expires_at, trust_level, trust_score, is_verified')
+        .eq('id', user.id)
+        .single();
+
+      const { data: profileData } = await supabase
+        .from('user_profiles')
+        .select('primary_photo_url, additional_photos, occupation')
+        .eq('user_id', user.id)
+        .single();
+
       if (userData) {
-        setProfile(JSON.parse(userData));
+        const isPremiumActive =
+          userData.is_premium &&
+          (!userData.premium_expires_at || new Date(userData.premium_expires_at) > new Date());
+        setProfile({
+          display_name: userData.full_name,
+          bio: userData.bio,
+          city: userData.city,
+          photos: profileData
+            ? [profileData.primary_photo_url, ...(profileData.additional_photos || [])].filter(Boolean)
+            : [],
+          occupation: profileData?.occupation || '',
+        });
+        setIsPremium(isPremiumActive);
+        setTrustLevel(userData.trust_level || 'unverified');
+        // Persist minimal copy for other screens
+        await AsyncStorage.setItem('userData', JSON.stringify({
+          display_name: userData.full_name,
+          city: userData.city,
+          trust_level: userData.trust_level,
+          profile_picture_url: profileData?.primary_photo_url || null,
+        }));
+      } else {
+        // Fallback to AsyncStorage cache while DB is being set up
+        const cached = await AsyncStorage.getItem('userData');
+        if (cached) setProfile(JSON.parse(cached));
       }
-      
-      setIsPremium(premium);
-      setTrustLevel(trust);
 
-      // Load stats
-      const token = await AsyncStorage.getItem('userToken');
-      const userId = await AsyncStorage.getItem('userId');
-      
-      // Mock stats for now
+      // Real stats from DB
+      const [{ count: matchCount }, { count: likeCount }] = await Promise.all([
+        supabase
+          .from('matches')
+          .select('id', { count: 'exact', head: true })
+          .or(`user1_id.eq.${user.id},user2_id.eq.${user.id}`),
+        supabase
+          .from('user_actions')
+          .select('id', { count: 'exact', head: true })
+          .eq('target_user_id', user.id)
+          .eq('action_type', 'like'),
+      ]);
+
       setStats({
-        matches: 24,
-        likes: 156,
-        views: 342
+        matches: matchCount || 0,
+        likes: likeCount || 0,
+        views: 0 // Views tracking not yet implemented
       });
-
     } catch (error) {
       console.error('Load profile error:', error);
+      // Fallback to cache
+      const cached = await AsyncStorage.getItem('userData');
+      if (cached) setProfile(JSON.parse(cached));
     } finally {
       setLoading(false);
     }
@@ -961,17 +1008,46 @@ const EditProfileScreen = ({ navigation }) => {
 
   const loadProfile = async () => {
     try {
-      const userData = await AsyncStorage.getItem('userData');
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data: userData } = await supabase
+        .from('users')
+        .select('full_name, bio, city')
+        .eq('id', user.id)
+        .single();
+
+      const { data: profileData } = await supabase
+        .from('user_profiles')
+        .select('primary_photo_url, additional_photos, occupation')
+        .eq('user_id', user.id)
+        .single();
+
       if (userData) {
-        const profile = JSON.parse(userData);
+        setDisplayName(userData.full_name || '');
+        setBio(userData.bio || '');
+        setCity(userData.city || '');
+      }
+      if (profileData) {
+        setOccupation(profileData.occupation || '');
+        const allPhotos = [
+          profileData.primary_photo_url,
+          ...(profileData.additional_photos || [])
+        ].filter(Boolean);
+        setPhotos(allPhotos);
+      }
+    } catch (error) {
+      console.error('Load profile error:', error);
+      // Fallback
+      const cached = await AsyncStorage.getItem('userData');
+      if (cached) {
+        const profile = JSON.parse(cached);
         setDisplayName(profile.display_name || '');
         setBio(profile.bio || '');
         setOccupation(profile.occupation || '');
         setCity(profile.city || '');
         setPhotos(profile.photos || []);
       }
-    } catch (error) {
-      console.error('Load profile error:', error);
     }
   };
 
@@ -1042,17 +1118,67 @@ const EditProfileScreen = ({ navigation }) => {
 
     setLoading(true);
     try {
-      // In real app, upload photos and save to API
-      const updatedProfile = {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
+      // Upload any new local-URI photos to Supabase storage
+      const uploadedPhotos = await Promise.all(
+        photos.map(async (uri, idx) => {
+          if (!uri || uri.startsWith('http')) return uri; // Already uploaded
+          const filePath = `${user.id}/photo_${idx}_${Date.now()}.jpg`;
+          const uploaded = await uploadMedia(uri, 'avatars', filePath);
+          return uploaded || uri;
+        })
+      );
+
+      const [primaryPhoto, ...additionalPhotos] = uploadedPhotos.filter(Boolean);
+
+      // Update users table
+      await supabase.from('users').update({
+        full_name: displayName,
+        bio,
+        city,
+      }).eq('id', user.id);
+
+      // Upsert user_profiles table
+      await supabase.from('user_profiles').upsert({
+        user_id: user.id,
+        primary_photo_url: primaryPhoto || null,
+        additional_photos: additionalPhotos,
+        occupation,
+      }, { onConflict: 'user_id' });
+
+      // Safety scan for profile photos: deepfake + sexual imagery detection
+      const photosToScan = [primaryPhoto, ...additionalPhotos].filter(Boolean);
+      if (photosToScan.length > 0) {
+        const scanResults = await deepfakeDetectionService.scanUserProfile(user.id, photosToScan);
+        const flagged = scanResults.filter(s => ['deepfake', 'nsfw', 'suspicious'].includes(s.result));
+
+        if (flagged.length > 0) {
+          await supabase.from('reports').insert({
+            reporter_id: user.id,
+            target_id: user.id,
+            content_type: 'profile_photo',
+            reason: `AUTO-DETECTED profile risk: ${flagged[0].result} (${flagged[0].reasoning || 'No reason'})`,
+            category: flagged[0].result === 'deepfake' ? 'deepfake' : 'sexual_content',
+            severity: flagged[0].confidence > 0.8 ? 'critical' : 'high',
+            auto_flagged: true,
+            status: 'pending',
+            ai_analysis: JSON.stringify(flagged[0]),
+          });
+        }
+      }
+
+      // Keep AsyncStorage in sync for quick offline reads
+      await AsyncStorage.setItem('userData', JSON.stringify({
         display_name: displayName,
         bio,
         occupation,
         city,
-        photos
-      };
+        photos: uploadedPhotos,
+        profile_picture_url: primaryPhoto || null,
+      }));
 
-      await AsyncStorage.setItem('userData', JSON.stringify(updatedProfile));
-      
       Alert.alert('Success', 'Profile updated successfully');
       navigation.goBack();
     } catch (error) {
@@ -1164,6 +1290,13 @@ const SettingsScreen = ({ navigation }) => {
   const [notifications, setNotifications] = useState(true);
   const [showOnline, setShowOnline] = useState(true);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [feedbackSubject, setFeedbackSubject] = useState('');
+  const [feedbackMessage, setFeedbackMessage] = useState('');
+  const [feedbackCategory, setFeedbackCategory] = useState('general');
+  const [feedbackLoading, setFeedbackLoading] = useState(false);
+  const [blockUserId, setBlockUserId] = useState('');
+  const [blockReason, setBlockReason] = useState('');
+  const [blockLoading, setBlockLoading] = useState(false);
 
   useEffect(() => {
     loadNotificationPreference();
@@ -1189,6 +1322,7 @@ const SettingsScreen = ({ navigation }) => {
           text: 'Logout',
           style: 'destructive',
           onPress: async () => {
+            await supabase.auth.signOut();
             await AsyncStorage.clear();
             // Navigate to auth
             console.log('Logged out');
@@ -1209,6 +1343,102 @@ const SettingsScreen = ({ navigation }) => {
       'Your account has been scheduled for deletion. You will receive a confirmation email.',
       [{ text: 'OK' }]
     );
+  };
+
+  const submitFeedback = async () => {
+    if (!feedbackSubject.trim() || !feedbackMessage.trim()) {
+      Alert.alert('Feedback', 'Please add both subject and message.');
+      return;
+    }
+
+    setFeedbackLoading(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
+      // Screen feedback for abuse/spam so admin gets categorized reports
+      const textCheck = await moderationService.screenText(feedbackMessage, user.id);
+
+      const { error } = await supabase.from('user_feedback').insert({
+        user_id: user.id,
+        category: feedbackCategory,
+        subject: feedbackSubject,
+        message: feedbackMessage,
+        status: 'open',
+      });
+
+      if (error) throw error;
+
+      // If risky feedback content is detected, auto-create report for admin queue
+      if (!textCheck.safe) {
+        await supabase.from('reports').insert({
+          reporter_id: user.id,
+          target_id: user.id,
+          content_type: 'feedback',
+          reason: `Feedback moderation flag: ${textCheck.reason}`,
+          category: textCheck.category || 'general',
+          severity: textCheck.severity || 'medium',
+          auto_flagged: true,
+          status: 'pending',
+          ai_analysis: JSON.stringify(textCheck),
+        });
+      }
+
+      setFeedbackSubject('');
+      setFeedbackMessage('');
+      setFeedbackCategory('general');
+      Alert.alert('Thanks', 'Your feedback has been submitted.');
+    } catch (error) {
+      console.error('submitFeedback error:', error);
+      Alert.alert('Error', error.message || 'Failed to submit feedback');
+    } finally {
+      setFeedbackLoading(false);
+    }
+  };
+
+  const submitBlockUser = async () => {
+    if (!blockUserId.trim()) {
+      Alert.alert('Block User', 'Please provide a user ID to block.');
+      return;
+    }
+
+    setBlockLoading(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+      if (user.id === blockUserId.trim()) throw new Error('You cannot block yourself');
+
+      const reason = blockReason.trim() || 'No reason provided';
+
+      const { error } = await supabase.from('user_blocks').upsert({
+        blocker_id: user.id,
+        blocked_id: blockUserId.trim(),
+        reason,
+      }, { onConflict: 'blocker_id,blocked_id' });
+
+      if (error) throw error;
+
+      // Create a moderation report so admin sees this block reason in dashboard
+      await supabase.from('reports').insert({
+        reporter_id: user.id,
+        target_id: blockUserId.trim(),
+        content_type: 'user_account',
+        reason: `User block reason: ${reason}`,
+        category: 'harassment',
+        severity: 'medium',
+        status: 'pending',
+        auto_flagged: false,
+      });
+
+      setBlockUserId('');
+      setBlockReason('');
+      Alert.alert('Blocked', 'User has been blocked and the report is visible to admins.');
+    } catch (error) {
+      console.error('submitBlockUser error:', error);
+      Alert.alert('Error', error.message || 'Failed to block user');
+    } finally {
+      setBlockLoading(false);
+    }
   };
 
   return (
@@ -1339,6 +1569,70 @@ const SettingsScreen = ({ navigation }) => {
             </View>
             <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
           </TouchableOpacity>
+
+          <View style={[styles.settingsItem, { alignItems: 'flex-start', flexDirection: 'column' }]}>
+            <Text style={[styles.settingsItemText, { marginLeft: 0, marginBottom: 10 }]}>Send Feedback</Text>
+            <TextInput
+              style={[styles.input, { width: '100%', marginBottom: 8 }]}
+              placeholder="Subject"
+              placeholderTextColor={colors.textSecondary}
+              value={feedbackSubject}
+              onChangeText={setFeedbackSubject}
+            />
+            <TextInput
+              style={[styles.input, styles.textArea, { width: '100%', marginBottom: 8 }]}
+              placeholder="Tell us your feedback / safety concern"
+              placeholderTextColor={colors.textSecondary}
+              value={feedbackMessage}
+              onChangeText={setFeedbackMessage}
+              multiline
+            />
+            <TouchableOpacity
+              style={[styles.saveButton, { width: '100%', marginTop: 0, opacity: feedbackLoading ? 0.7 : 1 }]}
+              onPress={submitFeedback}
+              disabled={feedbackLoading}
+            >
+              {feedbackLoading ? (
+                <ActivityIndicator size="small" color={colors.text} />
+              ) : (
+                <Text style={styles.saveButtonText}>Submit Feedback</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+
+          <View style={[styles.settingsItem, { alignItems: 'flex-start', flexDirection: 'column' }]}>
+            <Text style={[styles.settingsItemText, { marginLeft: 0, marginBottom: 10 }]}>Block User</Text>
+            <TextInput
+              style={[styles.input, { width: '100%', marginBottom: 8 }]}
+              placeholder="Target user ID"
+              placeholderTextColor={colors.textSecondary}
+              value={blockUserId}
+              onChangeText={setBlockUserId}
+              autoCapitalize="none"
+            />
+            <TextInput
+              style={[styles.input, styles.textArea, { width: '100%', marginBottom: 8 }]}
+              placeholder="Reason (harassment, spam, abuse...)"
+              placeholderTextColor={colors.textSecondary}
+              value={blockReason}
+              onChangeText={setBlockReason}
+              multiline
+            />
+            <TouchableOpacity
+              style={[styles.actionButton, { width: '100%', marginBottom: 0, opacity: blockLoading ? 0.7 : 1 }]}
+              onPress={submitBlockUser}
+              disabled={blockLoading}
+            >
+              {blockLoading ? (
+                <ActivityIndicator size="small" color={colors.text} />
+              ) : (
+                <>
+                  <Ionicons name="hand-left-outline" size={20} color={colors.text} />
+                  <Text style={styles.actionButtonText}>Block & Report</Text>
+                </>
+              )}
+            </TouchableOpacity>
+          </View>
 
           <TouchableOpacity style={styles.settingsItem}>
             <View style={styles.settingsItemLeft}>

@@ -232,7 +232,7 @@ Current conversation context: This is a dating app conversation. Be authentic an
       const { data, error } = await supabase
         .from('fish_trap_messages')
         .select('sender_type, content, displayed_content, created_at')
-        .eq('conversation_id', interactionId)
+        .eq('interaction_id', interactionId)
         .order('created_at', { ascending: true })
         .limit(20);
 

@@ -1,523 +1,531 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TrustHub Admin - Platform Control</title>
-    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <style>
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: .5; }
-        }
-        .animate-pulse {
-            animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-        }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Suyavaraa Admin Safety Console</title>
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 </head>
-<body>
-    <div id="root"></div>
+<body class="bg-slate-100">
+  <div id="root"></div>
 
-    <script type="text/babel">
-        const { useState } = React;
+  <script type="text/babel">
+    const { useState, useEffect, useCallback, useMemo } = React;
 
-        // Icon Components
-        const Shield = ({className, style}) => (
-            <svg className={className} style={style} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-            </svg>
-        );
+    const SUPABASE_URL = window.__SUYAVARAA_SUPABASE_URL__ || 'https://mocbhyhccwwbczcqcdwb.supabase.co';
+    const SUPABASE_ANON_KEY = window.__SUYAVARAA_SUPABASE_ANON_KEY__
+      || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1vY2JoeWhjY3d3YmN6Y3FjZHdiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE3Nzc1OTgsImV4cCI6MjA4NzM1MzU5OH0.Xzo9Yv29oTdjWyqnfedQAfh4vUYxSOVKLF5cKjsYZuk';
 
-        const Users = ({className, style}) => (
-            <svg className={className} style={style} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
-            </svg>
-        );
+    const supa = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-        const AlertTriangle = ({className, style}) => (
-            <svg className={className} style={style} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
-            </svg>
-        );
+    const fmtTime = (iso) => {
+      if (!iso) return '—';
+      const d = new Date(iso);
+      return d.toLocaleString();
+    };
 
-        const Flag = ({className, style}) => (
-            <svg className={className} style={style} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/>
-            </svg>
-        );
+    const badge = (text, cls) => (
+      <span className={`px-2 py-1 rounded text-xs font-semibold ${cls}`}>{text}</span>
+    );
 
-        const TrendingUp = ({className, style}) => (
-            <svg className={className} style={style} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/>
-            </svg>
-        );
+    const severityBadgeClass = (s) => {
+      if (s === 'critical') return 'bg-red-100 text-red-700';
+      if (s === 'high') return 'bg-orange-100 text-orange-700';
+      if (s === 'medium') return 'bg-yellow-100 text-yellow-800';
+      return 'bg-slate-100 text-slate-700';
+    };
 
-        const Activity = ({className, style}) => (
-            <svg className={className} style={style} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
-            </svg>
-        );
+    const categoryBadgeClass = (c) => {
+      if (c === 'sexual_content') return 'bg-pink-100 text-pink-700';
+      if (c === 'harassment') return 'bg-orange-100 text-orange-700';
+      if (c === 'deepfake') return 'bg-purple-100 text-purple-700';
+      if (c === 'spam') return 'bg-blue-100 text-blue-700';
+      if (c === 'scam') return 'bg-red-100 text-red-700';
+      return 'bg-slate-100 text-slate-700';
+    };
 
-        const User = ({className, style}) => (
-            <svg className={className} style={style} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
-            </svg>
-        );
+    const AiAdminBotCard = ({ reports, deepfakeScans, feedback }) => {
+      const summary = useMemo(() => {
+        const pendingReports = reports.filter(r => r.status === 'pending');
+        const critical = pendingReports.filter(r => r.severity === 'critical').length;
+        const sexual = pendingReports.filter(r => r.category === 'sexual_content').length;
+        const harassment = pendingReports.filter(r => r.category === 'harassment').length;
+        const deepfake = pendingReports.filter(r => r.category === 'deepfake').length;
+        const openFeedback = feedback.filter(f => f.status === 'open').length;
+        const suspiciousScans = deepfakeScans.filter(s => ['deepfake', 'nsfw', 'suspicious'].includes(s.result)).length;
 
-        const CheckCircle = ({className, style}) => (
-            <svg className={className} style={style} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>
-            </svg>
-        );
+        const nextAction =
+          critical > 0
+            ? 'Prioritize critical reports immediately.'
+            : suspiciousScans > 0
+              ? 'Review suspicious deepfake/NSFW scans.'
+              : openFeedback > 10
+                ? 'Triage user feedback backlog.'
+                : 'No urgent AI safety escalation right now.';
 
-        const X = ({className, style}) => (
-            <svg className={className} style={style} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-            </svg>
-        );
+        return { critical, sexual, harassment, deepfake, openFeedback, suspiciousScans, nextAction };
+      }, [reports, deepfakeScans, feedback]);
 
-        const ArrowLeft = ({className, style}) => (
-            <svg className={className} style={style} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/>
-            </svg>
-        );
+      return (
+        <div className="bg-white rounded-xl shadow p-6">
+          <h2 className="text-xl font-bold mb-3">Admin Report AI Bot</h2>
+          <p className="text-sm text-slate-600 mb-4">
+            Live AI triage summary generated from reports, deepfake scans, and feedback queues.
+          </p>
+          <div className="grid grid-cols-2 md:grid-cols-6 gap-3 mb-4">
+            <div className="bg-red-50 p-3 rounded"><div className="text-xs text-slate-500">Critical</div><div className="text-2xl font-bold text-red-700">{summary.critical}</div></div>
+            <div className="bg-pink-50 p-3 rounded"><div className="text-xs text-slate-500">Sexual</div><div className="text-2xl font-bold text-pink-700">{summary.sexual}</div></div>
+            <div className="bg-orange-50 p-3 rounded"><div className="text-xs text-slate-500">Harassment</div><div className="text-2xl font-bold text-orange-700">{summary.harassment}</div></div>
+            <div className="bg-purple-50 p-3 rounded"><div className="text-xs text-slate-500">Deepfake</div><div className="text-2xl font-bold text-purple-700">{summary.deepfake}</div></div>
+            <div className="bg-blue-50 p-3 rounded"><div className="text-xs text-slate-500">Suspicious Scans</div><div className="text-2xl font-bold text-blue-700">{summary.suspiciousScans}</div></div>
+            <div className="bg-slate-100 p-3 rounded"><div className="text-xs text-slate-500">Open Feedback</div><div className="text-2xl font-bold text-slate-700">{summary.openFeedback}</div></div>
+          </div>
+          <div className="bg-slate-50 border border-slate-200 rounded p-4">
+            <div className="text-xs text-slate-500 mb-1">Recommended action</div>
+            <div className="text-sm font-semibold text-slate-800">{summary.nextAction}</div>
+          </div>
+        </div>
+      );
+    };
 
-        const AdminDashboard = ({ onLogout }) => {
-            const [selectedFlag, setSelectedFlag] = useState(null);
-            const [selectedUser, setSelectedUser] = useState(null);
+    const AdminDashboard = ({ adminUser, onLogout }) => {
+      const [loading, setLoading] = useState(true);
+      const [refreshing, setRefreshing] = useState(false);
+      const [users, setUsers] = useState([]);
+      const [reports, setReports] = useState([]);
+      const [feedback, setFeedback] = useState([]);
+      const [blocks, setBlocks] = useState([]);
+      const [deepfakeScans, setDeepfakeScans] = useState([]);
+      const [autoRemovals, setAutoRemovals] = useState([]);
+      const [verificationQueue, setVerificationQueue] = useState([]);
+      const [message, setMessage] = useState('');
 
-            const adminStats = {
-                totalUsers: 45239,
-                verificationPending: 127,
-                activeFlags: 23,
-                todaySignups: 342,
-                trustScoreAvg: 8.7
-            };
+      const loadData = useCallback(async () => {
+        setRefreshing(true);
+        try {
+          const [
+            { data: usersData },
+            { data: reportsData },
+            { data: feedbackData },
+            { data: blocksData },
+            { data: scansData },
+            { data: removalsData },
+            { data: vqData },
+          ] = await Promise.all([
+            supa.from('users').select('id, full_name, email, is_banned, ban_reason, ban_expires_at, trust_score, is_verified, created_at').order('created_at', { ascending: false }).limit(30),
+            supa.from('reports').select('id, reporter_id, target_id, content_type, reason, category, severity, auto_flagged, status, created_at, ai_analysis').order('created_at', { ascending: false }).limit(80),
+            supa.from('user_feedback').select('id, user_id, category, subject, message, rating, status, admin_reply, created_at').order('created_at', { ascending: false }).limit(50),
+            supa.from('user_blocks').select('id, blocker_id, blocked_id, reason, created_at').order('created_at', { ascending: false }).limit(80),
+            supa.from('deepfake_scans').select('id, user_id, image_url, scan_type, result, confidence_score, ai_reasoning, action_taken, scanned_at').order('scanned_at', { ascending: false }).limit(80),
+            supa.from('content_auto_removals').select('id, user_id, content_type, content_id, content_preview, removal_reason, category, ai_confidence, removed_at').order('removed_at', { ascending: false }).limit(80),
+            supa.from('verification_requests').select('id, user_id, status, media_url, created_at').eq('status', 'pending').order('created_at', { ascending: true }).limit(20),
+          ]);
 
-            const aiFlags = [
-                {
-                    id: 1, user: 'Rahul K.', userId: 'FM_4521', app: 'Forever Us', type: 'Encoded Phone',
-                    message: 'User shared: "contact me at ninefivefivethreefourone"', severity: 'high',
-                    time: '5 mins ago', action: 'Auto-deleted',
-                    details: 'AI detected encoded phone number in chat message. Message automatically deleted and user warned.'
-                },
-                {
-                    id: 2, user: 'Priya M.', userId: 'HM_8934', app: 'Heavenly Matchmaking', type: 'Money Request',
-                    message: 'Asked for ₹50,000 for "emergency medical"', severity: 'critical',
-                    time: '12 mins ago', action: 'Under Review',
-                    details: 'User requested money from match. Pattern matches known scam behavior. Account temporarily restricted.'
-                },
-                {
-                    id: 3, user: 'Arjun S.', userId: 'FM_7623', app: 'Forever Us', type: 'Suspicious Pattern',
-                    message: 'Same message sent to 15+ users in 10 minutes', severity: 'medium',
-                    time: '1 hour ago', action: 'Warning Issued',
-                    details: 'Mass messaging detected. User sent identical message to multiple profiles rapidly.'
-                },
-                {
-                    id: 4, user: 'Sneha P.', userId: 'HM_3421', app: 'Both Apps', type: 'Cross-App Violation',
-                    message: 'Different age/details on both platforms', severity: 'high',
-                    time: '2 hours ago', action: 'Account Suspended',
-                    details: 'Profile inconsistencies detected across platforms. Age differs by 5 years, different profession listed.'
-                }
-            ];
+          setUsers(usersData || []);
+          setReports(reportsData || []);
+          setFeedback(feedbackData || []);
+          setBlocks(blocksData || []);
+          setDeepfakeScans(scansData || []);
+          setAutoRemovals(removalsData || []);
+          setVerificationQueue(vqData || []);
+        } catch (err) {
+          console.error('Load admin data error:', err);
+          setMessage('Error loading admin data');
+        } finally {
+          setLoading(false);
+          setRefreshing(false);
+        }
+      }, []);
 
-            const verificationQueue = [
-                { name: 'Amit Kumar', type: 'Aadhaar', status: 'pending', app: 'Heavenly Matchmaking', submitted: '10 mins ago', userId: 'HM_5521' },
-                { name: 'Neha Singh', type: 'Video', status: 'pending', app: 'Forever Us', submitted: '25 mins ago', userId: 'FM_8832' },
-                { name: 'Vikram Rao', type: 'Background', status: 'in_progress', app: 'Heavenly Matchmaking', submitted: '1 hour ago', userId: 'HM_3398' }
-            ];
+      useEffect(() => {
+        loadData();
+        const id = setInterval(loadData, 30000);
+        return () => clearInterval(id);
+      }, [loadData]);
 
-            const recentUsers = [
-                {
-                    name: 'Anjali Desai', userId: 'HM_8821', app: 'Heavenly Matchmaking',
-                    trustScore: 9.4, status: 'active', joined: '2 days ago',
-                    verifications: ['Aadhaar', 'Video', 'Background']
-                },
-                {
-                    name: 'Karan Mehta', userId: 'FM_5543', app: 'Forever Us',
-                    trustScore: 8.2, status: 'active', joined: '5 days ago',
-                    verifications: ['Aadhaar', 'Video']
-                },
-                {
-                    name: 'Shreya Kapoor', userId: 'HM_9987', app: 'Both Apps',
-                    trustScore: 9.8, status: 'verified', joined: '1 week ago',
-                    verifications: ['Aadhaar', 'Video', 'Background', 'Employment']
-                }
-            ];
+      const resolveReport = async (id, status) => {
+        const { error } = await supa.from('reports').update({
+          status,
+          resolved_at: new Date().toISOString(),
+          resolved_by: adminUser.id,
+        }).eq('id', id);
 
-            return (
-                <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50">
-                    {selectedFlag && (
-                        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-                            <div className="bg-white rounded-2xl max-w-2xl w-full shadow-2xl">
-                                <div className="p-6 border-b flex justify-between items-center">
-                                    <h2 className="text-2xl font-bold">Flag Details</h2>
-                                    <button onClick={() => setSelectedFlag(null)} className="p-2 hover:bg-gray-100 rounded-lg">
-                                        <X style={{width: '24px', height: '24px'}} />
-                                    </button>
-                                </div>
-                                <div className="p-6">
-                                    <div className={`border-l-4 rounded-lg p-6 mb-6 ${
-                                        selectedFlag.severity === 'critical' ? 'bg-red-50 border-red-500' :
-                                        selectedFlag.severity === 'high' ? 'bg-orange-50 border-orange-500' :
-                                        'bg-yellow-50 border-yellow-500'
-                                    }`}>
-                                        <div className="flex items-center gap-3 mb-4">
-                                            <span className="text-2xl font-bold">{selectedFlag.user}</span>
-                                            <span className="text-gray-600">({selectedFlag.userId})</span>
-                                        </div>
-                                        <div className="grid grid-cols-2 gap-4 mb-4">
-                                            <div>
-                                                <p className="text-sm text-gray-600">Platform</p>
-                                                <p className="font-semibold">{selectedFlag.app}</p>
-                                            </div>
-                                            <div>
-                                                <p className="text-sm text-gray-600">Type</p>
-                                                <p className="font-semibold">{selectedFlag.type}</p>
-                                            </div>
-                                        </div>
-                                        <div className="mb-4">
-                                            <p className="text-sm text-gray-600 mb-2">Flagged Message</p>
-                                            <p className="font-semibold bg-white p-3 rounded">{selectedFlag.message}</p>
-                                        </div>
-                                        <div>
-                                            <p className="text-sm text-gray-600 mb-2">AI Analysis</p>
-                                            <p className="text-gray-700">{selectedFlag.details}</p>
-                                        </div>
-                                    </div>
-                                    <div className="flex gap-3">
-                                        <button className="flex-1 bg-green-600 text-white py-3 rounded-lg font-semibold hover:bg-green-700">
-                                            Approve Action
-                                        </button>
-                                        <button className="flex-1 bg-red-600 text-white py-3 rounded-lg font-semibold hover:bg-red-700">
-                                            Take Further Action
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    )}
+        if (!error) {
+          setMessage(`Report ${status}`);
+          loadData();
+        } else {
+          setMessage(error.message);
+        }
+      };
 
-                    {selectedUser && (
-                        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-                            <div className="bg-white rounded-2xl max-w-2xl w-full shadow-2xl">
-                                <div className="p-6 border-b flex justify-between items-center">
-                                    <h2 className="text-2xl font-bold">User Profile</h2>
-                                    <button onClick={() => setSelectedUser(null)} className="p-2 hover:bg-gray-100 rounded-lg">
-                                        <X style={{width: '24px', height: '24px'}} />
-                                    </button>
-                                </div>
-                                <div className="p-6">
-                                    <div className="text-center mb-6">
-                                        <div className="w-24 h-24 bg-gradient-to-br from-purple-400 to-pink-400 rounded-full mx-auto mb-4 flex items-center justify-center text-4xl text-white font-bold">
-                                            {selectedUser.name.charAt(0)}
-                                        </div>
-                                        <h3 className="text-2xl font-bold mb-1">{selectedUser.name}</h3>
-                                        <p className="text-gray-600">{selectedUser.userId}</p>
-                                        <div className="flex items-center justify-center gap-2 mt-3">
-                                            <Shield style={{width: '20px', height: '20px'}} className="text-purple-600" />
-                                            <span className="text-xl font-bold text-purple-600">Trust Score: {selectedUser.trustScore}</span>
-                                        </div>
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-4 mb-6">
-                                        <div className="bg-gray-50 p-4 rounded-lg">
-                                            <p className="text-sm text-gray-600">Platform</p>
-                                            <p className="font-semibold">{selectedUser.app}</p>
-                                        </div>
-                                        <div className="bg-gray-50 p-4 rounded-lg">
-                                            <p className="text-sm text-gray-600">Status</p>
-                                            <p className="font-semibold capitalize">{selectedUser.status}</p>
-                                        </div>
-                                    </div>
-                                    <div className="mb-6">
-                                        <h4 className="font-bold mb-3">Completed Verifications</h4>
-                                        <div className="flex flex-wrap gap-2">
-                                            {selectedUser.verifications.map((v, idx) => (
-                                                <span key={idx} className="px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm font-semibold flex items-center gap-1">
-                                                    <CheckCircle style={{width: '16px', height: '16px'}} />
-                                                    {v}
-                                                </span>
-                                            ))}
-                                        </div>
-                                    </div>
-                                    <div className="flex gap-3">
-                                        <button className="flex-1 bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700">
-                                            View Full Profile
-                                        </button>
-                                        <button className="flex-1 bg-orange-600 text-white py-3 rounded-lg font-semibold hover:bg-orange-700">
-                                            Flag Account
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    )}
+      const processVerification = async (row, approved) => {
+        const status = approved ? 'approved' : 'rejected';
+        const { error } = await supa.from('verification_requests').update({
+          status,
+          reviewed_at: new Date().toISOString(),
+          reviewed_by: adminUser.id,
+        }).eq('id', row.id);
 
-                    <header className="bg-white shadow-md sticky top-0 z-40">
-                        <div className="max-w-7xl mx-auto px-4 py-4">
-                            <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-3">
-                                    <button onClick={() => window.location.href = 'index.html'} className="p-2 hover:bg-gray-100 rounded-lg transition">
-                                        <ArrowLeft style={{width: '24px', height: '24px'}} />
-                                    </button>
-                                    <div className="bg-gradient-to-r from-slate-600 to-slate-800 p-2 rounded-xl">
-                                        <Shield style={{width: '24px', height: '24px'}} className="text-white" />
-                                    </div>
-                                    <div>
-                                        <h1 className="text-2xl font-bold text-gray-900">TrustHub Admin</h1>
-                                        <p className="text-xs text-gray-600">Real-time Monitoring & Control</p>
-                                    </div>
-                                </div>
-                                <div className="flex items-center gap-4">
-                                    <span className="px-3 py-1 bg-green-100 text-green-600 rounded-full text-sm font-bold flex items-center gap-1">
-                                        <div className="w-2 h-2 bg-green-600 rounded-full animate-pulse"></div>
-                                        LIVE
-                                    </span>
-                                    <button onClick={onLogout} className="px-4 py-2 bg-gray-100 text-gray-700 hover:bg-gray-200 rounded-lg text-sm font-semibold transition">
-                                        Logout
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    </header>
+        if (!error && approved) {
+          await supa.from('users').update({ is_verified: true, trust_level: 'green_verified' }).eq('id', row.user_id);
+        }
 
-                    <div className="max-w-7xl mx-auto px-4 py-8 space-y-6">
-                        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-                            <div className="bg-white rounded-xl p-6 shadow-lg border-l-4 border-blue-500">
-                                <div className="flex items-center justify-between">
-                                    <div>
-                                        <p className="text-gray-600 text-sm">Total Users</p>
-                                        <p className="text-3xl font-bold text-gray-900">{adminStats.totalUsers.toLocaleString()}</p>
-                                    </div>
-                                    <Users style={{width: '40px', height: '40px'}} className="text-blue-500" />
-                                </div>
-                            </div>
-                            <div className="bg-white rounded-xl p-6 shadow-lg border-l-4 border-orange-500">
-                                <div className="flex items-center justify-between">
-                                    <div>
-                                        <p className="text-gray-600 text-sm">Pending Verifications</p>
-                                        <p className="text-3xl font-bold text-gray-900">{adminStats.verificationPending}</p>
-                                    </div>
-                                    <AlertTriangle style={{width: '40px', height: '40px'}} className="text-orange-500" />
-                                </div>
-                            </div>
-                            <div className="bg-white rounded-xl p-6 shadow-lg border-l-4 border-red-500">
-                                <div className="flex items-center justify-between">
-                                    <div>
-                                        <p className="text-gray-600 text-sm">Active Flags</p>
-                                        <p className="text-3xl font-bold text-gray-900">{adminStats.activeFlags}</p>
-                                    </div>
-                                    <Flag style={{width: '40px', height: '40px'}} className="text-red-500" />
-                                </div>
-                            </div>
-                            <div className="bg-white rounded-xl p-6 shadow-lg border-l-4 border-green-500">
-                                <div className="flex items-center justify-between">
-                                    <div>
-                                        <p className="text-gray-600 text-sm">Today's Signups</p>
-                                        <p className="text-3xl font-bold text-gray-900">{adminStats.todaySignups}</p>
-                                    </div>
-                                    <TrendingUp style={{width: '40px', height: '40px'}} className="text-green-500" />
-                                </div>
-                            </div>
-                            <div className="bg-white rounded-xl p-6 shadow-lg border-l-4 border-purple-500">
-                                <div className="flex items-center justify-between">
-                                    <div>
-                                        <p className="text-gray-600 text-sm">Avg Trust Score</p>
-                                        <p className="text-3xl font-bold text-gray-900">{adminStats.trustScoreAvg}</p>
-                                    </div>
-                                    <Shield style={{width: '40px', height: '40px'}} className="text-purple-500" />
-                                </div>
-                            </div>
-                        </div>
+        if (!error) {
+          setMessage(`Verification ${status}`);
+          loadData();
+        }
+      };
 
-                        <div className="bg-white rounded-xl shadow-lg p-6">
-                            <div className="flex items-center gap-3 mb-6">
-                                <Activity style={{width: '24px', height: '24px'}} className="text-red-500" />
-                                <h2 className="text-2xl font-bold text-gray-900">AI Detection - Live Flags</h2>
-                                <span className="px-3 py-1 bg-red-100 text-red-600 rounded-full text-sm font-bold">LIVE</span>
-                            </div>
+      const banUser = async (userId) => {
+        const reason = window.prompt('Ban reason (required):', 'policy violation');
+        if (!reason) return;
 
-                            <div className="space-y-4">
-                                {aiFlags.map(flag => (
-                                    <div key={flag.id} className={`border-l-4 rounded-lg p-4 cursor-pointer hover:shadow-md transition ${
-                                        flag.severity === 'critical' ? 'bg-red-50 border-red-500' :
-                                        flag.severity === 'high' ? 'bg-orange-50 border-orange-500' :
-                                        'bg-yellow-50 border-yellow-500'
-                                    }`}>
-                                        <div className="flex items-start justify-between">
-                                            <div className="flex-1">
-                                                <div className="flex items-center gap-3 mb-2 flex-wrap">
-                                                    <span className="font-bold text-gray-900">{flag.user}</span>
-                                                    <span className="text-sm text-gray-600">({flag.userId})</span>
-                                                    <span className={`px-2 py-1 rounded-full text-xs font-bold ${
-                                                        flag.app === 'Both Apps' ? 'bg-purple-100 text-purple-700' :
-                                                        flag.app === 'Forever Us' ? 'bg-pink-100 text-pink-700' :
-                                                        'bg-blue-100 text-blue-700'
-                                                    }`}>
-                                                        {flag.app}
-                                                    </span>
-                                                    <span className={`px-2 py-1 rounded-full text-xs font-bold ${
-                                                        flag.severity === 'critical' ? 'bg-red-100 text-red-700' :
-                                                        flag.severity === 'high' ? 'bg-orange-100 text-orange-700' :
-                                                        'bg-yellow-100 text-yellow-700'
-                                                    }`}>
-                                                        {flag.type}
-                                                    </span>
-                                                </div>
-                                                <p className="text-gray-700 mb-2">{flag.message}</p>
-                                                <div className="flex items-center gap-4 text-sm">
-                                                    <span className="text-gray-500">⏰ {flag.time}</span>
-                                                    <span className={`font-semibold ${
-                                                        flag.action === 'Auto-deleted' || flag.action === 'Account Banned' ? 'text-green-600' :
-                                                        flag.action === 'Account Suspended' ? 'text-red-600' :
-                                                        'text-orange-600'
-                                                    }`}>
-                                                        ✓ {flag.action}
-                                                    </span>
-                                                </div>
-                                            </div>
-                                            <button onClick={() => setSelectedFlag(flag)} className="px-4 py-2 bg-gray-800 text-white rounded-lg font-semibold hover:bg-gray-900 transition">
-                                                Review
-                                            </button>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
+        const { error } = await supa.from('users').update({
+          is_banned: true,
+          ban_reason: reason,
+        }).eq('id', userId);
 
-                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                            <div className="bg-white rounded-xl shadow-lg p-6">
-                                <h2 className="text-2xl font-bold text-gray-900 mb-6">Verification Queue</h2>
-                                <div className="space-y-3">
-                                    {verificationQueue.map((item, idx) => (
-                                        <div key={idx} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition">
-                                            <div className="flex items-center gap-4">
-                                                <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
-                                                    <User style={{width: '24px', height: '24px'}} className="text-blue-600" />
-                                                </div>
-                                                <div>
-                                                    <p className="font-semibold text-gray-900">{item.name}</p>
-                                                    <p className="text-sm text-gray-600">{item.app}</p>
-                                                </div>
-                                            </div>
-                                            <div className="flex items-center gap-3">
-                                                <span className="px-3 py-1 bg-purple-100 text-purple-700 rounded-full text-sm font-semibold">
-                                                    {item.type}
-                                                </span>
-                                                <button className="px-4 py-2 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700">
-                                                    Process
-                                                </button>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
+        if (!error) {
+          await supa.from('admin_activity_log').insert({
+            admin_id: adminUser.id,
+            action: 'ban_user',
+            target_type: 'user',
+            target_id: userId,
+            details: { reason }
+          });
 
-                            <div className="bg-white rounded-xl shadow-lg p-6">
-                                <h2 className="text-2xl font-bold text-gray-900 mb-6">Recent Users</h2>
-                                <div className="space-y-3">
-                                    {recentUsers.map((user, idx) => (
-                                        <div key={idx} className="p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition cursor-pointer" onClick={() => setSelectedUser(user)}>
-                                            <div className="flex items-center justify-between mb-3">
-                                                <div className="flex items-center gap-3">
-                                                    <div className="w-10 h-10 bg-gradient-to-br from-purple-400 to-pink-400 rounded-full flex items-center justify-center text-white font-bold">
-                                                        {user.name.charAt(0)}
-                                                    </div>
-                                                    <div>
-                                                        <p className="font-semibold text-gray-900">{user.name}</p>
-                                                        <p className="text-xs text-gray-600">{user.userId}</p>
-                                                    </div>
-                                                </div>
-                                                <div className="flex items-center gap-2">
-                                                    <Shield style={{width: '16px', height: '16px'}} className="text-purple-600" />
-                                                    <span className="font-bold text-purple-600">{user.trustScore}</span>
-                                                </div>
-                                            </div>
-                                            <div className="flex items-center justify-between text-sm">
-                                                <span className="text-gray-600">{user.app}</span>
-                                                <span className="text-gray-500">{user.joined}</span>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        </div>
+          setMessage('User banned');
+          loadData();
+        } else {
+          setMessage(error.message);
+        }
+      };
+
+      const unbanUser = async (userId) => {
+        const { error } = await supa.from('users').update({
+          is_banned: false,
+          ban_reason: null,
+          ban_expires_at: null,
+        }).eq('id', userId);
+
+        if (!error) {
+          await supa.from('admin_activity_log').insert({
+            admin_id: adminUser.id,
+            action: 'unban_user',
+            target_type: 'user',
+            target_id: userId,
+            details: {}
+          });
+          setMessage('User unbanned');
+          loadData();
+        } else {
+          setMessage(error.message);
+        }
+      };
+
+      const closeFeedback = async (id) => {
+        const reply = window.prompt('Optional admin reply:', 'Reviewed. Thanks for reporting this.');
+        const { error } = await supa.from('user_feedback').update({
+          status: 'closed',
+          admin_reply: reply || null,
+          admin_id: adminUser.id,
+        }).eq('id', id);
+
+        if (!error) {
+          setMessage('Feedback closed');
+          loadData();
+        }
+      };
+
+      if (loading) {
+        return <div className="min-h-screen flex items-center justify-center text-slate-700">Loading admin console...</div>;
+      }
+
+      const pendingReports = reports.filter(r => r.status === 'pending');
+      const spamReports = reports.filter(r => r.category === 'spam');
+      const sexualReports = reports.filter(r => r.category === 'sexual_content');
+      const harassmentReports = reports.filter(r => r.category === 'harassment');
+      const deepfakeReports = reports.filter(r => r.category === 'deepfake');
+      const bannedUsers = users.filter(u => u.is_banned);
+
+      return (
+        <div className="min-h-screen bg-slate-100">
+          <header className="bg-white border-b sticky top-0 z-20">
+            <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between gap-4">
+              <div>
+                <h1 className="text-2xl font-bold text-slate-900">Suyavaraa Admin Safety Console</h1>
+                <p className="text-sm text-slate-500">Live trust, safety, feedback, blocks, AI scans and moderation actions.</p>
+              </div>
+              <div className="flex items-center gap-2">
+                {message ? <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">{message}</span> : null}
+                <button onClick={loadData} className="px-3 py-2 rounded bg-slate-800 text-white text-sm">{refreshing ? 'Refreshing...' : 'Refresh'}</button>
+                <button onClick={onLogout} className="px-3 py-2 rounded bg-slate-200 text-slate-800 text-sm">Logout</button>
+              </div>
+            </div>
+          </header>
+
+          <main className="max-w-7xl mx-auto p-4 space-y-6">
+            <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
+              <div className="bg-white rounded p-4"><div className="text-xs text-slate-500">Total Users</div><div className="text-2xl font-bold">{users.length}</div></div>
+              <div className="bg-white rounded p-4"><div className="text-xs text-slate-500">Pending Reports</div><div className="text-2xl font-bold text-red-700">{pendingReports.length}</div></div>
+              <div className="bg-white rounded p-4"><div className="text-xs text-slate-500">Spam Reports</div><div className="text-2xl font-bold text-blue-700">{spamReports.length}</div></div>
+              <div className="bg-white rounded p-4"><div className="text-xs text-slate-500">Sexual Reports</div><div className="text-2xl font-bold text-pink-700">{sexualReports.length}</div></div>
+              <div className="bg-white rounded p-4"><div className="text-xs text-slate-500">Harassment</div><div className="text-2xl font-bold text-orange-700">{harassmentReports.length}</div></div>
+              <div className="bg-white rounded p-4"><div className="text-xs text-slate-500">Deepfake</div><div className="text-2xl font-bold text-purple-700">{deepfakeReports.length}</div></div>
+            </div>
+
+            <AiAdminBotCard reports={reports} deepfakeScans={deepfakeScans} feedback={feedback} />
+
+            <section className="bg-white rounded-xl shadow p-4">
+              <h2 className="text-lg font-bold mb-3">Reports Queue (Spam, Harassment, Sexual, Deepfake)</h2>
+              <div className="overflow-auto">
+                <table className="w-full text-sm">
+                  <thead className="text-left bg-slate-50">
+                    <tr>
+                      <th className="p-2">Time</th>
+                      <th className="p-2">Type</th>
+                      <th className="p-2">Category</th>
+                      <th className="p-2">Severity</th>
+                      <th className="p-2">Reason</th>
+                      <th className="p-2">Status</th>
+                      <th className="p-2">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {reports.map(r => (
+                      <tr key={r.id} className="border-b align-top">
+                        <td className="p-2 whitespace-nowrap">{fmtTime(r.created_at)}</td>
+                        <td className="p-2">{r.content_type}</td>
+                        <td className="p-2">{badge(r.category || 'general', categoryBadgeClass(r.category))}</td>
+                        <td className="p-2">{badge(r.severity || 'medium', severityBadgeClass(r.severity))}</td>
+                        <td className="p-2 max-w-sm">{r.reason} {r.auto_flagged ? badge('auto', 'bg-slate-800 text-white ml-2') : null}</td>
+                        <td className="p-2">{r.status}</td>
+                        <td className="p-2 space-x-2">
+                          {r.status === 'pending' ? (
+                            <>
+                              <button onClick={() => resolveReport(r.id, 'resolved')} className="px-2 py-1 bg-green-600 text-white rounded">Resolve</button>
+                              <button onClick={() => resolveReport(r.id, 'dismissed')} className="px-2 py-1 bg-red-600 text-white rounded">Dismiss</button>
+                            </>
+                          ) : <span className="text-slate-500">—</span>}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <section className="bg-white rounded-xl shadow p-4">
+                <h2 className="text-lg font-bold mb-3">Blocked Users (who blocked whom + reason)</h2>
+                <div className="space-y-2">
+                  {blocks.length === 0 ? <p className="text-slate-500 text-sm">No blocks recorded.</p> : null}
+                  {blocks.map(b => (
+                    <div key={b.id} className="p-3 bg-slate-50 rounded border text-sm">
+                      <div><span className="font-semibold">Blocker:</span> {b.blocker_id}</div>
+                      <div><span className="font-semibold">Blocked:</span> {b.blocked_id}</div>
+                      <div><span className="font-semibold">Reason:</span> {b.reason || '—'}</div>
+                      <div className="text-xs text-slate-500 mt-1">{fmtTime(b.created_at)}</div>
                     </div>
+                  ))}
                 </div>
-            );
-        };
+              </section>
 
-        const App = () => {
-            const [isAuthenticated, setIsAuthenticated] = useState(false);
-            const [email, setEmail] = useState('');
-            const [password, setPassword] = useState('');
-            const [error, setError] = useState('');
-
-            const handleLogin = (e) => {
-                e.preventDefault();
-                if (email === 'admin@suyavaraa.com' && password === 'Suyavaraa2026!') {
-                    setIsAuthenticated(true);
-                    setError('');
-                } else {
-                    setError('Invalid admin credentials');
-                }
-            };
-
-            if (isAuthenticated) {
-                return <AdminDashboard onLogout={() => setIsAuthenticated(false)} />;
-            }
-
-            return (
-                <div className="min-h-screen bg-gradient-to-br from-gray-900 to-blue-900 flex items-center justify-center p-4">
-                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
-                        <div className="bg-gradient-to-r from-blue-600 to-purple-600 p-8 text-center">
-                            <Shield style={{width: '48px', height: '48px', margin: '0 auto'}} className="text-white mb-4" />
-                            <h2 className="text-3xl font-bold text-white mb-2">Suyavaraa Admin</h2>
-                            <p className="text-blue-100">Restricted Access Gateway</p>
-                        </div>
-                        <div className="p-8">
-                            <form onSubmit={handleLogin} className="space-y-6">
-                                {error && (
-                                    <div className="bg-red-50 text-red-600 p-3 rounded-lg text-sm text-center border border-red-200">
-                                        {error}
-                                    </div>
-                                )}
-                                <div>
-                                    <label className="block text-sm font-semibold text-gray-700 mb-2">Admin Email</label>
-                                    <input 
-                                        type="email" 
-                                        className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition"
-                                        placeholder="admin@suyavaraa.com"
-                                        value={email}
-                                        onChange={(e) => setEmail(e.target.value)}
-                                        required
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-semibold text-gray-700 mb-2">Admin Password</label>
-                                    <input 
-                                        type="password" 
-                                        className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition"
-                                        placeholder="••••••••"
-                                        value={password}
-                                        onChange={(e) => setPassword(e.target.value)}
-                                        required
-                                    />
-                                </div>
-                                <button type="submit" className="w-full bg-blue-600 text-white font-bold py-3 rounded-lg hover:bg-blue-700 transition duration-200 shadow-md">
-                                    Authenticate
-                                </button>
-                            </form>
-                        </div>
+              <section className="bg-white rounded-xl shadow p-4">
+                <h2 className="text-lg font-bold mb-3">User Feedback</h2>
+                <div className="space-y-2">
+                  {feedback.length === 0 ? <p className="text-slate-500 text-sm">No feedback yet.</p> : null}
+                  {feedback.map(f => (
+                    <div key={f.id} className="p-3 bg-slate-50 rounded border text-sm">
+                      <div className="flex items-center justify-between">
+                        <div className="font-semibold">{f.subject}</div>
+                        <div>{badge(f.status, f.status === 'open' ? 'bg-orange-100 text-orange-700' : 'bg-green-100 text-green-700')}</div>
+                      </div>
+                      <div className="text-xs text-slate-500 mb-1">{f.category} • user: {f.user_id}</div>
+                      <div className="mb-2">{f.message}</div>
+                      {f.status === 'open' ? (
+                        <button onClick={() => closeFeedback(f.id)} className="px-2 py-1 bg-slate-800 text-white rounded text-xs">Close</button>
+                      ) : (
+                        <div className="text-xs text-slate-600">Admin reply: {f.admin_reply || '—'}</div>
+                      )}
                     </div>
+                  ))}
                 </div>
-            );
-        };
+              </section>
+            </div>
 
-        ReactDOM.render(<App />, document.getElementById('root'));
-    </script>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <section className="bg-white rounded-xl shadow p-4">
+                <h2 className="text-lg font-bold mb-3">Deepfake / NSFW Detection Logs</h2>
+                <div className="space-y-2 max-h-[420px] overflow-auto">
+                  {deepfakeScans.length === 0 ? <p className="text-slate-500 text-sm">No scan data.</p> : null}
+                  {deepfakeScans.map(s => (
+                    <div key={s.id} className="p-3 bg-slate-50 rounded border text-sm">
+                      <div className="flex items-center justify-between">
+                        <div className="font-semibold">{s.scan_type}</div>
+                        <div>{badge(s.result, categoryBadgeClass(s.result === 'nsfw' ? 'sexual_content' : s.result))}</div>
+                      </div>
+                      <div className="text-xs text-slate-500">user: {s.user_id}</div>
+                      <div>confidence: {s.confidence_score ?? '—'}</div>
+                      <div className="text-xs mt-1">{s.ai_reasoning || '—'}</div>
+                      <div className="text-xs text-slate-500 mt-1">{fmtTime(s.scanned_at)}</div>
+                    </div>
+                  ))}
+                </div>
+              </section>
+
+              <section className="bg-white rounded-xl shadow p-4">
+                <h2 className="text-lg font-bold mb-3">Sexual Post Auto-Removals</h2>
+                <div className="space-y-2 max-h-[420px] overflow-auto">
+                  {autoRemovals.length === 0 ? <p className="text-slate-500 text-sm">No auto removals yet.</p> : null}
+                  {autoRemovals.map(r => (
+                    <div key={r.id} className="p-3 bg-slate-50 rounded border text-sm">
+                      <div className="flex items-center justify-between">
+                        <div className="font-semibold">{r.content_type}</div>
+                        <div>{badge(r.category || 'general', categoryBadgeClass(r.category))}</div>
+                      </div>
+                      <div className="text-xs text-slate-500">user: {r.user_id}</div>
+                      <div className="mt-1">reason: {r.removal_reason}</div>
+                      <div className="text-xs mt-1">confidence: {r.ai_confidence ?? '—'}</div>
+                      <div className="text-xs text-slate-500 mt-1">{fmtTime(r.removed_at)}</div>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            </div>
+
+            <section className="bg-white rounded-xl shadow p-4">
+              <h2 className="text-lg font-bold mb-3">User Management (ban reason + unban)</h2>
+              <div className="space-y-2">
+                {users.map(u => (
+                  <div key={u.id} className="p-3 bg-slate-50 rounded border text-sm flex items-start justify-between gap-3">
+                    <div>
+                      <div className="font-semibold">{u.full_name || u.email || u.id}</div>
+                      <div className="text-xs text-slate-500">{u.id}</div>
+                      <div className="text-xs mt-1">Trust: {u.trust_score ?? '—'} • Verified: {u.is_verified ? 'Yes' : 'No'}</div>
+                      <div className="text-xs mt-1">Banned: {u.is_banned ? 'Yes' : 'No'} {u.ban_reason ? `• reason: ${u.ban_reason}` : ''}</div>
+                      <div className="text-xs text-slate-500 mt-1">Joined: {fmtTime(u.created_at)}</div>
+                    </div>
+                    <div className="space-x-2 whitespace-nowrap">
+                      {u.is_banned ? (
+                        <button onClick={() => unbanUser(u.id)} className="px-2 py-1 bg-green-600 text-white rounded">Unban</button>
+                      ) : (
+                        <button onClick={() => banUser(u.id)} className="px-2 py-1 bg-red-600 text-white rounded">Ban</button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            <section className="bg-white rounded-xl shadow p-4">
+              <h2 className="text-lg font-bold mb-3">Verification Queue</h2>
+              <div className="space-y-2">
+                {verificationQueue.length === 0 ? <p className="text-slate-500 text-sm">No pending verification requests.</p> : null}
+                {verificationQueue.map(v => (
+                  <div key={v.id} className="p-3 bg-slate-50 rounded border text-sm flex items-center justify-between gap-3">
+                    <div>
+                      <div className="font-semibold">User: {v.user_id}</div>
+                      <div className="text-xs text-slate-500">{fmtTime(v.created_at)}</div>
+                      {v.media_url ? <a className="text-blue-600 underline text-xs" target="_blank" rel="noreferrer" href={v.media_url}>Open proof</a> : null}
+                    </div>
+                    <div className="space-x-2">
+                      <button onClick={() => processVerification(v, true)} className="px-2 py-1 bg-green-600 text-white rounded">Approve</button>
+                      <button onClick={() => processVerification(v, false)} className="px-2 py-1 bg-red-600 text-white rounded">Reject</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            <section className="bg-white rounded-xl shadow p-4">
+              <h2 className="text-lg font-bold mb-2">Banned Users Snapshot</h2>
+              <p className="text-sm text-slate-500 mb-3">Includes ban reason and who is currently restricted.</p>
+              <div className="space-y-2">
+                {bannedUsers.length === 0 ? <p className="text-slate-500 text-sm">No banned users right now.</p> : null}
+                {bannedUsers.map(u => (
+                  <div key={u.id} className="p-3 bg-red-50 border border-red-200 rounded text-sm">
+                    <div className="font-semibold text-red-800">{u.full_name || u.email || u.id}</div>
+                    <div className="text-xs text-red-700">Reason: {u.ban_reason || 'Not provided'}</div>
+                    <div className="text-xs text-red-600 mt-1">Since: {fmtTime(u.created_at)}</div>
+                  </div>
+                ))}
+              </div>
+            </section>
+          </main>
+        </div>
+      );
+    };
+
+    const App = () => {
+      const [authed, setAuthed] = useState(false);
+      const [adminUser, setAdminUser] = useState(null);
+      const [email, setEmail] = useState('');
+      const [password, setPassword] = useState('');
+      const [error, setError] = useState('');
+      const [loading, setLoading] = useState(false);
+
+      const login = async (e) => {
+        e.preventDefault();
+        setLoading(true);
+        setError('');
+        try {
+          const { data, error: authError } = await supa.auth.signInWithPassword({ email, password });
+          if (authError) throw authError;
+
+          const { data: adminRow, error: adminErr } = await supa
+            .from('admin_users')
+            .select('role')
+            .eq('user_id', data.user.id)
+            .single();
+
+          if (adminErr || !adminRow) {
+            await supa.auth.signOut();
+            throw new Error('Access denied. Not in admin_users table.');
+          }
+
+          setAuthed(true);
+          setAdminUser(data.user);
+        } catch (err) {
+          setError(err.message || 'Login failed');
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      const logout = async () => {
+        await supa.auth.signOut();
+        setAuthed(false);
+        setAdminUser(null);
+      };
+
+      if (authed) return <AdminDashboard adminUser={adminUser} onLogout={logout} />;
+
+      return (
+        <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
+          <form onSubmit={login} className="bg-white rounded-xl shadow-xl p-8 w-full max-w-md space-y-4">
+            <h1 className="text-2xl font-bold text-slate-900">Admin Login</h1>
+            <p className="text-sm text-slate-500">Safety console access is restricted to admin_users.</p>
+            {error ? <div className="text-sm bg-red-50 border border-red-200 text-red-700 p-2 rounded">{error}</div> : null}
+            <div>
+              <label className="text-sm font-medium text-slate-700 block mb-1">Email</label>
+              <input className="w-full border rounded px-3 py-2" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+            </div>
+            <div>
+              <label className="text-sm font-medium text-slate-700 block mb-1">Password</label>
+              <input className="w-full border rounded px-3 py-2" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+            </div>
+            <button className="w-full bg-slate-800 text-white py-2 rounded" type="submit" disabled={loading}>{loading ? 'Signing in...' : 'Sign in'}</button>
+          </form>
+        </div>
+      );
+    };
+
+    ReactDOM.render(<App />, document.getElementById('root'));
+  </script>
 </body>
 </html>

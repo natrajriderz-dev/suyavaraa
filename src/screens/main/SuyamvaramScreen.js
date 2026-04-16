@@ -41,6 +41,7 @@ const SuyamvaramScreen = ({ navigation }) => {
         .from('suyamvaram_challenges')
         .select(`
           *,
+          participant_count,
           auth_users:creator_id (
             email,
             raw_user_meta_data
@@ -74,7 +75,7 @@ const SuyamvaramScreen = ({ navigation }) => {
             creator: creatorName,
             creator_image: profileImage,
             creator_id: challenge.creator_id,
-            participants: 0, // TODO: Fetch participant count
+            participants: challenge.participant_count || 0,
             max_participants: challenge.max_participants,
             deadline: deadlineStr,
             reward: challenge.reward,

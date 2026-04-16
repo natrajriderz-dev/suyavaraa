@@ -8,6 +8,7 @@ const { supabase } = require('./supabase');
 const { ModeProvider } = require('./context/ModeContext');
 const ErrorBoundary = require('./src/components/shared/ErrorBoundary');
 const notificationService = require('./src/services/notificationService');
+const decoyRequestScheduler = require('./src/jobs/decoyRequestScheduler');
 
 // Navigation Stacks
 const AuthStack = require('./screens/auth/AuthStack');
@@ -25,6 +26,9 @@ const App = () => {
 
   useEffect(() => {
     checkSession();
+    return () => {
+      decoyRequestScheduler.stop();
+    };
   }, []);
 
   const checkSession = async () => {
@@ -47,6 +51,11 @@ const App = () => {
         } else {
           setInitialRoute('Onboarding');
         }
+
+        // Start the decoy request scheduler — sends automated decoy requests to
+        // unverified users to surface scammer behaviour (Fish Trap system).
+        // The scheduler uses UNIQUE constraints so concurrent device runs are safe.
+        decoyRequestScheduler.start();
       } else {
         console.log('No session found, navigating to Auth');
         setInitialRoute('Auth');
