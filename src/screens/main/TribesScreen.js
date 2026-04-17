@@ -15,15 +15,14 @@ const { Ionicons } = require('@expo/vector-icons');
 const AsyncStorage = require('@react-native-async-storage/async-storage').default;
 const { supabase } = require('../../../supabase');
 const { useMode } = require('../../../context/ModeContext');
-const { supabase } = require('../../../supabase');
+const { isOwnerUser } = require('../../config/privilegedAccess');
 const Colors = require('../../theme/Colors');
 const { tribesData } = require('../../utils/constants');
 const TribeCard = require('../../components/tribes/TribeCard');
 const MyTribeCard = require('../../components/tribes/MyTribeCard');
 
 const TribesScreen = ({ navigation }) => {
-  const { userMode } = useMode();
-  const [isPremium, setIsPremium] = useState(false);
+  const { userMode, isPremium } = useMode();
   const [userTribes, setUserTribes] = useState([]);
   const [allTribes, setAllTribes] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -37,11 +36,12 @@ const TribesScreen = ({ navigation }) => {
 
   const loadUserData = async () => {
     try {
-      const premium = await AsyncStorage.getItem('isPremium') === 'true';
-      setIsPremium(premium);
-
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
+
+      if (isOwnerUser(user.id)) {
+        await AsyncStorage.setItem('isPremium', 'true');
+      }
 
       const { data: rows, error } = await supabase
         .from('user_tribes')

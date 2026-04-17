@@ -17,6 +17,45 @@ const AuthStyles = require('./AuthStyles');
 const Colors = require('../../theme/Colors');
 const { pickMedia, compressImage, uploadMedia } = require('../../utils/mediaUtils');
 
+const normalizeDateOfBirth = (value) => {
+  const raw = (value || '').trim();
+  if (!raw) return null;
+
+  // Already ISO-like: YYYY-MM-DD
+  const isoPattern = /^(\d{4})-(\d{2})-(\d{2})$/;
+  const isoMatch = raw.match(isoPattern);
+  if (isoMatch) {
+    const [, y, m, d] = isoMatch;
+    const parsed = new Date(`${y}-${m}-${d}T00:00:00Z`);
+    if (!Number.isNaN(parsed.getTime())) return `${y}-${m}-${d}`;
+    return null;
+  }
+
+  // UI format: DD/MM/YYYY
+  const dmyPattern = /^(\d{2})\/(\d{2})\/(\d{4})$/;
+  const dmyMatch = raw.match(dmyPattern);
+  if (!dmyMatch) return null;
+
+  const [, dd, mm, yyyy] = dmyMatch;
+  const day = Number(dd);
+  const month = Number(mm);
+  const year = Number(yyyy);
+
+  if (month < 1 || month > 12 || day < 1 || day > 31 || year < 1900) return null;
+
+  const parsed = new Date(Date.UTC(year, month - 1, day));
+  const valid =
+    parsed.getUTCFullYear() === year &&
+    parsed.getUTCMonth() === month - 1 &&
+    parsed.getUTCDate() === day;
+
+  if (!valid) return null;
+
+  const normalizedMonth = String(month).padStart(2, '0');
+  const normalizedDay = String(day).padStart(2, '0');
+  return `${year}-${normalizedMonth}-${normalizedDay}`;
+};
+
 const BasicInfoScreen = ({ navigation, route }) => {
   const [fullName, setFullName] = useState('');
   const [dob, setDob] = useState('');
@@ -54,6 +93,12 @@ const BasicInfoScreen = ({ navigation, route }) => {
       return;
     }
 
+    const normalizedDob = normalizeDateOfBirth(dob);
+    if (!normalizedDob) {
+      setError('Date of birth must be in DD/MM/YYYY format');
+      return;
+    }
+
     setLoading(true);
     setError('');
 
@@ -72,10 +117,10 @@ const BasicInfoScreen = ({ navigation, route }) => {
       const { error: userError } = await supabase
         .from('users')
         .update({
-          full_name: fullName,
-          date_of_birth: dob,
+          full_name: fullName.trim(),
+          date_of_birth: normalizedDob,
           gender: gender.toLowerCase(),
-          city: city,
+          city: city.trim(),
           profile_complete: true
         })
         .eq('id', user.id);
@@ -136,7 +181,7 @@ const BasicInfoScreen = ({ navigation, route }) => {
       <TextInput style={AuthStyles.input} value={fullName} onChangeText={setFullName} placeholder="Enter your full name" placeholderTextColor={Colors.textSecondary} />
 
       <Text style={AuthStyles.inputLabel}>Date of Birth</Text>
-      <TextInput style={AuthStyles.input} value={dob} onChangeText={setDob} placeholder="DD/MM/YYYY" placeholderTextColor={Colors.textSecondary} />
+      <TextInput style={AuthStyles.input} value={dob} onChangeText={setDob} placeholder="DD/MM/YYYY" placeholderTextColor={Colors.textSecondary} keyboardType="number-pad" />
 
       <Text style={AuthStyles.inputLabel}>Gender</Text>
       <View style={AuthStyles.row}>

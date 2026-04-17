@@ -20,6 +20,7 @@ CREATE INDEX IF NOT EXISTS idx_notification_tokens_active ON notification_tokens
 ALTER TABLE notification_tokens ENABLE ROW LEVEL SECURITY;
 
 -- Users can only see and manage their own notification tokens
+DROP POLICY IF EXISTS "Users can manage their notification tokens" ON notification_tokens;
 CREATE POLICY "Users can manage their notification tokens"
   ON notification_tokens
   FOR ALL

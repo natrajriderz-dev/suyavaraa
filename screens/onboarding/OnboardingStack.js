@@ -22,6 +22,7 @@ const AsyncStorage = require('@react-native-async-storage/async-storage').defaul
 const axios = require('axios');
 const { pickMedia, compressImage, uploadMedia } = require('../../src/utils/mediaUtils');
 const { supabase } = require('../../supabase');
+const { isOwnerUser } = require('../../src/config/privilegedAccess');
 
 const Camera = ExpoCamera.Camera || ExpoCamera;
 const CameraView = ExpoCamera.CameraView || ExpoCamera.default || null;
@@ -913,13 +914,23 @@ const VerificationScreen = ({ navigation }) => {
   const cameraRef = useRef(null);
   const timerRef = useRef(null);
 
+  const requestCameraPermission = async () => {
+    const requestFn =
+      ExpoCamera.requestCameraPermissionsAsync ||
+      Camera.requestCameraPermissionsAsync;
+
+    if (!requestFn) {
+      setHasPermission(false);
+      return;
+    }
+
+    const { status } = await requestFn();
+    setHasPermission(status === 'granted');
+  };
+
   useEffect(() => {
     (async () => {
-      const requestCameraPermission =
-        ExpoCamera.requestCameraPermissionsAsync ||
-        Camera.requestCameraPermissionsAsync;
-      const { status } = await requestCameraPermission();
-      setHasPermission(status === 'granted');
+      await requestCameraPermission();
     })();
   }, []);
 
@@ -950,6 +961,14 @@ const VerificationScreen = ({ navigation }) => {
   const startRecording = async () => {
     if (!cameraRef.current) return;
 
+    if (!cameraRef.current.recordAsync) {
+      Alert.alert(
+        'Recording Unavailable',
+        'Live recording is unavailable on this device/build. Please upload a verification video from your gallery.'
+      );
+      return;
+    }
+
     setIsRecording(true);
     setRecordingTime(0);
 
@@ -961,15 +980,27 @@ const VerificationScreen = ({ navigation }) => {
       setRecordedVideo(video);
     } catch (error) {
       console.error('Recording error:', error);
-      Alert.alert('Error', 'Failed to record video');
+      Alert.alert('Error', error.message || 'Failed to record video');
+      setIsRecording(false);
     }
   };
 
   const stopRecording = () => {
-    if (!cameraRef.current) return;
+    if (!cameraRef.current || !cameraRef.current.stopRecording) return;
     
     cameraRef.current.stopRecording();
     setIsRecording(false);
+  };
+
+  const pickVerificationVideo = async () => {
+    try {
+      const picked = await pickMedia('library', false, 'video');
+      if (!picked?.uri) return;
+      setRecordedVideo({ uri: picked.uri });
+      setRecordingTime(0);
+    } catch (error) {
+      Alert.alert('Error', error.message || 'Failed to pick verification video');
+    }
   };
 
   const retakeVideo = () => {
@@ -1002,7 +1033,11 @@ const VerificationScreen = ({ navigation }) => {
 
       if (requestError) throw requestError;
 
-      const isPremium = await AsyncStorage.getItem('isPremium') === 'true';
+      const premiumFlag = await AsyncStorage.getItem('isPremium') === 'true';
+      const isPremium = premiumFlag || isOwnerUser(user.id);
+      if (isOwnerUser(user.id)) {
+        await AsyncStorage.setItem('isPremium', 'true');
+      }
       
       if (isPremium) {
         navigation.navigate('TribeZoneSelect');
@@ -1029,7 +1064,7 @@ const VerificationScreen = ({ navigation }) => {
       }
     } catch (error) {
       console.error('Verification error:', error);
-      Alert.alert('Error', 'Failed to submit verification');
+      Alert.alert('Error', error.message || 'Failed to submit verification');
     }
   };
 
@@ -1050,14 +1085,15 @@ const VerificationScreen = ({ navigation }) => {
         </Text>
         <TouchableOpacity
           style={styles.button}
-          onPress={() => {
-            const requestCameraPermission =
-              ExpoCamera.requestCameraPermissionsAsync ||
-              Camera.requestCameraPermissionsAsync;
-            requestCameraPermission();
-          }}
+          onPress={requestCameraPermission}
         >
           <Text style={styles.buttonText}>Grant Permission</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.button, styles.buttonOutline, { marginTop: 12 }]}
+          onPress={pickVerificationVideo}
+        >
+          <Text style={styles.buttonOutlineText}>Upload Video Instead</Text>
         </TouchableOpacity>
       </View>
     );
@@ -1070,6 +1106,12 @@ const VerificationScreen = ({ navigation }) => {
         <Text style={styles.subtitle}>
           This build cannot render the camera view right now. Please update the app build or use file upload instead.
         </Text>
+        <TouchableOpacity
+          style={[styles.button, { marginTop: 12 }]}
+          onPress={pickVerificationVideo}
+        >
+          <Text style={styles.buttonText}>Upload Verification Video</Text>
+        </TouchableOpacity>
       </View>
     );
   }
@@ -1189,7 +1231,12 @@ const TribeZoneSelectScreen = ({ navigation }) => {
   useEffect(() => {
     const loadUserData = async () => {
       const mode = await AsyncStorage.getItem('userMode');
-      const premium = await AsyncStorage.getItem('isPremium') === 'true';
+      const { data: { user } } = await supabase.auth.getUser();
+      const premiumFlag = await AsyncStorage.getItem('isPremium') === 'true';
+      const premium = premiumFlag || isOwnerUser(user?.id);
+      if (isOwnerUser(user?.id)) {
+        await AsyncStorage.setItem('isPremium', 'true');
+      }
       setUserMode(mode || 'dating');
       setIsPremium(premium);
     };

@@ -121,6 +121,13 @@ CREATE TABLE IF NOT EXISTS public.user_actions (
   UNIQUE(actor_user_id, target_user_id)
 );
 
+-- Ensure columns exist if the table was created with different schema
+ALTER TABLE public.user_actions
+  ADD COLUMN IF NOT EXISTS actor_user_id UUID REFERENCES public.users(id) ON DELETE CASCADE,
+  ADD COLUMN IF NOT EXISTS target_user_id UUID REFERENCES public.users(id) ON DELETE CASCADE,
+  ADD COLUMN IF NOT EXISTS action_type TEXT,
+  ADD COLUMN IF NOT EXISTS created_at TIMESTAMP WITH TIME ZONE DEFAULT now();
+
 CREATE INDEX IF NOT EXISTS idx_user_actions_actor ON public.user_actions(actor_user_id);
 CREATE INDEX IF NOT EXISTS idx_user_actions_target ON public.user_actions(target_user_id);
 
@@ -141,6 +148,12 @@ CREATE TABLE IF NOT EXISTS public.matches (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
   UNIQUE(user1_id, user2_id)
 );
+
+-- Ensure columns exist if table was created with different schema
+ALTER TABLE public.matches
+  ADD COLUMN IF NOT EXISTS user1_id UUID REFERENCES public.users(id) ON DELETE CASCADE,
+  ADD COLUMN IF NOT EXISTS user2_id UUID REFERENCES public.users(id) ON DELETE CASCADE,
+  ADD COLUMN IF NOT EXISTS created_at TIMESTAMP WITH TIME ZONE DEFAULT now();
 
 CREATE INDEX IF NOT EXISTS idx_matches_user1 ON public.matches(user1_id);
 CREATE INDEX IF NOT EXISTS idx_matches_user2 ON public.matches(user2_id);
@@ -169,6 +182,15 @@ CREATE TABLE IF NOT EXISTS public.messages (
   read_at TIMESTAMP WITH TIME ZONE,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT now()
 );
+
+-- Ensure columns exist if table was created with different schema
+ALTER TABLE public.messages
+  ADD COLUMN IF NOT EXISTS match_id UUID REFERENCES public.matches(id) ON DELETE CASCADE,
+  ADD COLUMN IF NOT EXISTS sender_id UUID REFERENCES public.users(id) ON DELETE CASCADE,
+  ADD COLUMN IF NOT EXISTS content TEXT,
+  ADD COLUMN IF NOT EXISTS message_type TEXT DEFAULT 'text',
+  ADD COLUMN IF NOT EXISTS read_at TIMESTAMP WITH TIME ZONE,
+  ADD COLUMN IF NOT EXISTS created_at TIMESTAMP WITH TIME ZONE DEFAULT now();
 
 CREATE INDEX IF NOT EXISTS idx_messages_match ON public.messages(match_id);
 CREATE INDEX IF NOT EXISTS idx_messages_sender ON public.messages(sender_id);
@@ -223,6 +245,15 @@ CREATE TABLE IF NOT EXISTS public.posts (
   visibility TEXT DEFAULT 'public' CHECK (visibility IN ('public','tribes','private')),
   created_at TIMESTAMP WITH TIME ZONE DEFAULT now()
 );
+
+-- Ensure columns exist if table was created with different schema
+ALTER TABLE public.posts
+  ADD COLUMN IF NOT EXISTS user_id UUID REFERENCES public.users(id) ON DELETE CASCADE,
+  ADD COLUMN IF NOT EXISTS caption TEXT,
+  ADD COLUMN IF NOT EXISTS media_urls TEXT[] DEFAULT '{}',
+  ADD COLUMN IF NOT EXISTS tribe_tags TEXT[] DEFAULT '{}',
+  ADD COLUMN IF NOT EXISTS visibility TEXT DEFAULT 'public',
+  ADD COLUMN IF NOT EXISTS created_at TIMESTAMP WITH TIME ZONE DEFAULT now();
 
 CREATE INDEX IF NOT EXISTS idx_posts_user ON public.posts(user_id);
 CREATE INDEX IF NOT EXISTS idx_posts_created ON public.posts(created_at DESC);

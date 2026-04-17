@@ -23,10 +23,12 @@ CREATE TABLE IF NOT EXISTS public.verification_requests (
 ALTER TABLE public.verification_requests ENABLE ROW LEVEL SECURITY;
 
 -- Policies for verification_requests
+DROP POLICY IF EXISTS "Users can view their own verification requests" ON public.verification_requests;
 CREATE POLICY "Users can view their own verification requests"
   ON public.verification_requests FOR SELECT
   USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can insert their own verification requests" ON public.verification_requests;
 CREATE POLICY "Users can insert their own verification requests"
   ON public.verification_requests FOR INSERT
   WITH CHECK (auth.uid() = user_id);
@@ -44,6 +46,7 @@ CREATE TABLE IF NOT EXISTS public.contact_info_logs (
 -- RLS for contact_info_logs
 ALTER TABLE public.contact_info_logs ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Admins can view all logs" ON public.contact_info_logs;
 CREATE POLICY "Admins can view all logs"
   ON public.contact_info_logs FOR SELECT
-  USING (EXISTS (SELECT 1 FROM public.users WHERE id = auth.uid() AND role = 'admin'));
+  USING (public.is_admin());

@@ -9,6 +9,7 @@ const ChatStack = require('./ChatStack');
 const ImpressScreen = require('./ImpressScreen');
 const TribesStack = require('./TribesScreen');
 const ProfileStack = require('./ProfileStack');
+const AdminScreen = require('./AdminScreen');
 const SuyamvaramScreen = require('../../src/screens/main/SuyamvaramScreen');
 
 const { useMode } = require('../../context/ModeContext');
@@ -17,10 +18,11 @@ const Colors = require('../../src/theme/Colors');
 const Tab = createBottomTabNavigator();
 
 const MainTabs = () => {
-  const { userMode } = useMode();
+  const { userMode, activeMode, isPrivilegedOwner } = useMode();
+  const isAdminMode = activeMode === 'admin' && isPrivilegedOwner;
 
   // Branding Colors matching the guide
-  const activeColor = userMode === 'matrimony' ? '#D4A017' : '#E91E63'; // Goldish vs Pink
+  const activeColor = isAdminMode ? '#0f766e' : (userMode === 'matrimony' ? '#D4A017' : '#E91E63'); // Teal for Admin
   const inactiveColor = '#8E8E93';
 
   return (
@@ -69,13 +71,13 @@ const MainTabs = () => {
       {/* Special Feature Tab (Tab 3) */}
       <Tab.Screen 
         name="Feature" 
-        component={userMode === 'dating' ? ImpressScreen : SuyamvaramScreen}
+        component={isAdminMode ? AdminScreen : (userMode === 'dating' ? ImpressScreen : SuyamvaramScreen)}
         options={{ 
-          tabBarLabel: userMode === 'dating' ? 'IMPRESS' : 'SUYAMVARAM',
+          tabBarLabel: isAdminMode ? 'ADMIN' : (userMode === 'dating' ? 'IMPRESS' : 'SUYAMVARAM'),
           tabBarIcon: ({ color, size, focused }) => (
             <View style={[styles.specialTab, { backgroundColor: focused ? activeColor : inactiveColor + '20' }]}>
               <Ionicons 
-                name={userMode === 'dating' ? 'flash' : 'ribbon'} 
+                name={isAdminMode ? 'shield-checkmark' : (userMode === 'dating' ? 'flash' : 'ribbon')} 
                 size={22} 
                 color={focused ? '#fff' : color} 
               />
@@ -106,6 +108,7 @@ const MainTabs = () => {
           )
         }} 
       />
+
     </Tab.Navigator>
   );
 };

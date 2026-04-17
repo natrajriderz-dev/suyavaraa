@@ -46,17 +46,37 @@ const decodeBase64ToArrayBuffer = (base64) => {
   return bytes.buffer;
 };
 
+const mimeByExt = {
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  png: 'image/png',
+  webp: 'image/webp',
+  gif: 'image/gif',
+  heic: 'image/heic',
+  heif: 'image/heif',
+  mp4: 'video/mp4',
+  mov: 'video/quicktime',
+  m4v: 'video/x-m4v',
+  webm: 'video/webm',
+};
+
+const inferMimeType = (path, fallback = 'application/octet-stream') => {
+  const cleanPath = (path || '').split('?')[0].split('#')[0];
+  const ext = cleanPath.includes('.') ? cleanPath.split('.').pop().toLowerCase() : '';
+  return mimeByExt[ext] || fallback;
+};
+
 /**
  * Picks an image from camera or library
  */
-const pickMedia = async (source = 'library', allowsEditing = true) => {
+const pickMedia = async (source = 'library', allowsEditing = true, mediaKind = 'image') => {
   try {
     // For web, use file input
     if (Platform.OS === 'web') {
       return new Promise((resolve) => {
         const input = document.createElement('input');
         input.type = 'file';
-        input.accept = 'image/*';
+        input.accept = mediaKind === 'video' ? 'video/*' : 'image/*';
         input.onchange = async (e) => {
           const file = e.target.files[0];
           if (file) {
@@ -66,7 +86,7 @@ const pickMedia = async (source = 'library', allowsEditing = true) => {
                 uri: event.target.result,
                 width: null,
                 height: null,
-                type: file.type,
+                type: file.type || inferMimeType(file.name),
                 name: file.name,
               });
             };
@@ -95,11 +115,19 @@ const pickMedia = async (source = 'library', allowsEditing = true) => {
     }
 
     const options = {
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: mediaKind === 'video'
+        ? ImagePicker.MediaTypeOptions.Videos
+        : ImagePicker.MediaTypeOptions.Images,
       allowsEditing,
       aspect: [1, 1],
       quality: 1,
     };
+
+    if (mediaKind === 'video') {
+      options.allowsEditing = false;
+      options.videoQuality = ImagePicker.VideoQuality['720p'];
+      options.videoMaxDuration = 30;
+    }
 
     const result = source === 'library'
       ? await ImagePicker.launchImageLibraryAsync(options)
@@ -156,8 +184,7 @@ const uploadMedia = async (uri, bucket, path) => {
     console.log(`📤 Starting upload to bucket: ${bucket}, path: ${path}`);
     
     const fileName = path.split('/').pop();
-    const ext = fileName.split('.').pop().toLowerCase();
-    const mimeType = `image/${ext === 'jpg' ? 'jpeg' : ext}`;
+    const mimeType = inferMimeType(fileName);
 
     let fileData;
     let uploadUri = uri;
@@ -176,7 +203,7 @@ const uploadMedia = async (uri, bucket, path) => {
       // For native: read the local file directly instead of fetch(file://...),
       // which commonly fails in React Native with "Network request failed".
       console.log('📱 Native platform detected');
-      const FileSystem = require('expo-file-system');
+      const FileSystem = require('expo-file-system/legacy');
       const fileInfo = await FileSystem.getInfoAsync(uploadUri);
 
       if (!fileInfo.exists) {

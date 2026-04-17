@@ -588,7 +588,7 @@ const styles = StyleSheet.create({
   },
 });
 
-const AccountSwitcher = ({ visible, onClose, currentMode, onSwitch, isPremium }) => {
+const AccountSwitcher = ({ visible, onClose, currentMode, onSwitch, isPremium, canUseAdminMode }) => {
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={onClose}>
@@ -644,9 +644,31 @@ const AccountSwitcher = ({ visible, onClose, currentMode, onSwitch, isPremium })
                 </View>
               )}
             </TouchableOpacity>
+
+            {canUseAdminMode ? (
+              <TouchableOpacity
+                style={[
+                  styles.switchAccountItem,
+                  {
+                    borderColor: currentMode === 'admin' ? '#0f766e' : '#eee',
+                    backgroundColor: currentMode === 'admin' ? '#0f766e10' : '#fff',
+                  }
+                ]}
+                onPress={() => onSwitch('admin')}
+              >
+                <View style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: '#0f766e20', justifyContent: 'center', alignItems: 'center' }}>
+                  <Text style={{ fontSize: 24 }}>🛡️</Text>
+                </View>
+                <View style={styles.switchAccountInfo}>
+                  <Text style={[styles.switchAccountName, { color: '#0f766e' }]}>Admin Mode</Text>
+                  <Text style={styles.switchAccountMode}>Moderation Dashboard & Safety Tools</Text>
+                </View>
+                {currentMode === 'admin' && <Ionicons name="checkmark-circle" size={24} color="#0f766e" />}
+              </TouchableOpacity>
+            ) : null}
           </View>
 
-          {!isPremium && (
+          {!isPremium && !canUseAdminMode && (
             <TouchableOpacity style={{ marginTop: 10, alignSelf: 'center' }} onPress={() => { onClose(); }}>
               <Text style={{ color: matrimonyColors.primary, fontWeight: 'bold' }}>Premium users only can switch modes</Text>
             </TouchableOpacity>
@@ -703,11 +725,11 @@ const FishTrapProfileScreen = ({ navigation }) => {
 // Profile Screen Component
 const ProfileScreen = ({ navigation }) => {
   const [profile, setProfile] = useState(null);
-  const { userMode, switchMode } = useMode();
+  const { userMode, activeMode, switchMode, isPrivilegedOwner } = useMode();
   const [isPremium, setIsPremium] = useState(false);
   const [trustLevel, setTrustLevel] = useState('unverified');
   const [loading, setLoading] = useState(true);
-  const [stats, setStats] = {
+  const [stats, setStats] = useState({
     matches: 0,
     likes: 0,
     views: 0
@@ -748,7 +770,7 @@ const ProfileScreen = ({ navigation }) => {
             : [],
           occupation: profileData?.occupation || '',
         });
-        setIsPremium(isPremiumActive);
+        setIsPremium(isPrivilegedOwner ? true : isPremiumActive);
         setTrustLevel(userData.trust_level || 'unverified');
         // Persist minimal copy for other screens
         await AsyncStorage.setItem('userData', JSON.stringify({
@@ -792,11 +814,23 @@ const ProfileScreen = ({ navigation }) => {
   };
 
   const [showSwitcher, setShowSwitcher] = useState(false);
-  const colors = userMode === 'matrimony' ? matrimonyColors : datingColors;
+  const effectiveMode = activeMode === 'admin' ? userMode : activeMode;
+  const colors = effectiveMode === 'matrimony' ? matrimonyColors : datingColors;
 
   const handleSwitchMode = (targetMode) => {
-    if (targetMode === userMode) {
+    if (targetMode === activeMode) {
       setShowSwitcher(false);
+      return;
+    }
+
+    if (targetMode === 'admin') {
+      if (!isPrivilegedOwner) {
+        Alert.alert('Access Denied', 'Admin mode is restricted.');
+        return;
+      }
+      switchMode('admin');
+      setShowSwitcher(false);
+      Alert.alert('Success', 'Switched to Admin mode');
       return;
     }
 
@@ -842,9 +876,10 @@ const ProfileScreen = ({ navigation }) => {
       <AccountSwitcher 
         visible={showSwitcher}
         onClose={() => setShowSwitcher(false)}
-        currentMode={userMode}
+        currentMode={activeMode}
         onSwitch={handleSwitchMode}
         isPremium={isPremium}
+        canUseAdminMode={isPrivilegedOwner}
       />
       <View style={[styles.header, { borderBottomColor: colors.border }]}>
         <Text style={styles.headerTitle}>Profile</Text>
@@ -893,10 +928,10 @@ const ProfileScreen = ({ navigation }) => {
 
           {/* Badges */}
           <View style={styles.badgesContainer}>
-            <View style={[styles.badge, userMode === 'dating' ? styles.badgePrimary : null]}>
-              <Text>{userMode === 'dating' ? '💘' : '💍'}</Text>
-              <Text style={[styles.badgeText, userMode === 'dating' ? styles.badgeTextPrimary : null]}>
-                {userMode === 'dating' ? 'Dating' : 'Matrimony'}
+            <View style={[styles.badge, effectiveMode === 'dating' ? styles.badgePrimary : null]}>
+              <Text>{activeMode === 'admin' ? '🛡️' : (effectiveMode === 'dating' ? '💘' : '💍')}</Text>
+              <Text style={[styles.badgeText, effectiveMode === 'dating' ? styles.badgeTextPrimary : null]}>
+                {activeMode === 'admin' ? 'Admin' : (effectiveMode === 'dating' ? 'Dating' : 'Matrimony')}
               </Text>
             </View>
 
@@ -980,10 +1015,10 @@ const ProfileScreen = ({ navigation }) => {
             onPress={() => setShowSwitcher(true)}
           >
             <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: colors.primary + '20', justifyContent: 'center', alignItems: 'center' }}>
-              <Text>{userMode === 'dating' ? '💘' : '💍'}</Text>
+              <Text>{activeMode === 'admin' ? '🛡️' : (effectiveMode === 'dating' ? '💘' : '💍')}</Text>
             </View>
             <Text style={[styles.actionButtonText, { color: colors.text }]}>
-              Switch Mode (Current: {userMode === 'dating' ? 'Dating' : 'Matrimony'})
+              Switch Mode (Current: {activeMode === 'admin' ? 'Admin' : (effectiveMode === 'dating' ? 'Dating' : 'Matrimony')})
             </Text>
             <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} style={{ marginLeft: 'auto', marginRight: 10 }} />
           </TouchableOpacity>

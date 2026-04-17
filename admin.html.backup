@@ -36,7 +36,6 @@
       if (s === 'critical') return 'bg-red-100 text-red-700';
       if (s === 'high') return 'bg-orange-100 text-orange-700';
       if (s === 'medium') return 'bg-yellow-100 text-yellow-800';
-      if (s === 'low') return 'bg-green-100 text-green-700';
       return 'bg-slate-100 text-slate-700';
     };
 
@@ -46,9 +45,6 @@
       if (c === 'deepfake') return 'bg-purple-100 text-purple-700';
       if (c === 'spam') return 'bg-blue-100 text-blue-700';
       if (c === 'scam') return 'bg-red-100 text-red-700';
-      if (c === 'violence') return 'bg-red-200 text-red-900';
-      if (c === 'hate_speech') return 'bg-red-300 text-red-950';
-      if (c === 'general') return 'bg-gray-100 text-gray-800';
       return 'bg-slate-100 text-slate-700';
     };
 
@@ -107,23 +103,8 @@
       const [autoRemovals, setAutoRemovals] = useState([]);
       const [verificationQueue, setVerificationQueue] = useState([]);
       const [message, setMessage] = useState('');
-      const [sessionExpired, setSessionExpired] = useState(false);
-
-      // Listen to auth state changes
-      useEffect(() => {
-        const { data: { subscription } } = supa.auth.onAuthStateChange((event, session) => {
-          if (event === 'SIGNED_OUT' || event === 'USER_DELETED' || event === 'TOKEN_REFRESHED') {
-            setSessionExpired(true);
-            setTimeout(() => {
-              onLogout();
-            }, 3000);
-          }
-        });
-        return () => subscription.unsubscribe();
-      }, [onLogout]);
 
       const loadData = useCallback(async () => {
-        if (sessionExpired) return;
         setRefreshing(true);
         try {
           const [
@@ -153,32 +134,20 @@
           setVerificationQueue(vqData || []);
         } catch (err) {
           console.error('Load admin data error:', err);
-          if (err.message?.includes('JWT')) {
-            setSessionExpired(true);
-            setMessage('Session expired. Please log in again.');
-          } else {
-            setMessage('Error loading admin data: ' + err.message);
-          }
+          setMessage('Error loading admin data');
         } finally {
           setLoading(false);
           setRefreshing(false);
         }
-      }, [sessionExpired]);
+      }, []);
 
       useEffect(() => {
-        if (!sessionExpired) {
-          loadData();
-          const id = setInterval(loadData, 30000);
-          return () => clearInterval(id);
-        }
-      }, [loadData, sessionExpired]);
+        loadData();
+        const id = setInterval(loadData, 30000);
+        return () => clearInterval(id);
+      }, [loadData]);
 
       const resolveReport = async (id, status) => {
-        const action = status === 'resolved' ? 'resolve' : 'dismiss';
-        if (!window.confirm(`Are you sure you want to ${action} this report?`)) {
-          return;
-        }
-        
         const { error } = await supa.from('reports').update({
           status,
           resolved_at: new Date().toISOString(),
@@ -194,111 +163,68 @@
       };
 
       const processVerification = async (row, approved) => {
-        const action = approved ? 'approve' : 'reject';
-        if (!window.confirm(`Are you sure you want to ${action} this verification request?`)) {
-          return;
-        }
-        
         const status = approved ? 'approved' : 'rejected';
-        const { error: updateError } = await supa.from('verification_requests').update({
+        const { error } = await supa.from('verification_requests').update({
           status,
           reviewed_at: new Date().toISOString(),
           reviewed_by: adminUser.id,
         }).eq('id', row.id);
 
-        if (updateError) {
-          setMessage(`Failed to update verification: ${updateError.message}`);
-          return;
+        if (!error && approved) {
+          await supa.from('users').update({ is_verified: true, trust_level: 'green_verified' }).eq('id', row.user_id);
         }
 
-        if (approved) {
-          const { error: userError } = await supa.from('users').update({ 
-            is_verified: true, 
-            trust_level: 'green_verified' 
-          }).eq('id', row.user_id);
-          
-          if (userError) {
-            setMessage(`Verification marked as ${status} but failed to update user: ${userError.message}`);
-            // Still reload data to show updated verification status
-            loadData();
-            return;
-          }
+        if (!error) {
+          setMessage(`Verification ${status}`);
+          loadData();
         }
-
-        setMessage(`Verification ${status}${approved ? ' and user verified' : ''}`);
-        loadData();
       };
 
       const banUser = async (userId) => {
-        const userName = users.find(u => u.id === userId)?.full_name || userId;
-        const reason = window.prompt(`Ban reason for ${userName} (required):`, 'policy violation');
-        if (!reason || reason.trim() === '') {
-          setMessage('Ban cancelled: reason required');
-          return;
-        }
-        
-        if (!window.confirm(`Are you sure you want to ban ${userName}? This action will restrict their account.`)) {
-          return;
-        }
+        const reason = window.prompt('Ban reason (required):', 'policy violation');
+        if (!reason) return;
 
-        const { error: banError } = await supa.from('users').update({
+        const { error } = await supa.from('users').update({
           is_banned: true,
-          ban_reason: reason.trim(),
+          ban_reason: reason,
         }).eq('id', userId);
 
-        if (banError) {
-          setMessage(`Ban failed: ${banError.message}`);
-          return;
+        if (!error) {
+          await supa.from('admin_activity_log').insert({
+            admin_id: adminUser.id,
+            action: 'ban_user',
+            target_type: 'user',
+            target_id: userId,
+            details: { reason }
+          });
+
+          setMessage('User banned');
+          loadData();
+        } else {
+          setMessage(error.message);
         }
-
-        const { error: logError } = await supa.from('admin_activity_log').insert({
-          admin_id: adminUser.id,
-          action: 'ban_user',
-          target_type: 'user',
-          target_id: userId,
-          details: { reason: reason.trim() }
-        });
-
-        if (logError) {
-          console.error('Failed to log admin action:', logError);
-          // Continue anyway
-        }
-
-        setMessage(`User ${userName} banned`);
-        loadData();
       };
 
       const unbanUser = async (userId) => {
-        const userName = users.find(u => u.id === userId)?.full_name || userId;
-        if (!window.confirm(`Are you sure you want to unban ${userName}?`)) {
-          return;
-        }
-
-        const { error: unbanError } = await supa.from('users').update({
+        const { error } = await supa.from('users').update({
           is_banned: false,
           ban_reason: null,
           ban_expires_at: null,
         }).eq('id', userId);
 
-        if (unbanError) {
-          setMessage(`Unban failed: ${unbanError.message}`);
-          return;
+        if (!error) {
+          await supa.from('admin_activity_log').insert({
+            admin_id: adminUser.id,
+            action: 'unban_user',
+            target_type: 'user',
+            target_id: userId,
+            details: {}
+          });
+          setMessage('User unbanned');
+          loadData();
+        } else {
+          setMessage(error.message);
         }
-
-        const { error: logError } = await supa.from('admin_activity_log').insert({
-          admin_id: adminUser.id,
-          action: 'unban_user',
-          target_type: 'user',
-          target_id: userId,
-          details: {}
-        });
-
-        if (logError) {
-          console.error('Failed to log admin action:', logError);
-        }
-
-        setMessage(`User ${userName} unbanned`);
-        loadData();
       };
 
       const closeFeedback = async (id) => {
@@ -314,18 +240,6 @@
           loadData();
         }
       };
-
-      if (sessionExpired) {
-        return (
-          <div className="min-h-screen flex items-center justify-center">
-            <div className="text-center p-8 bg-white rounded-xl shadow">
-              <h2 className="text-xl font-bold text-red-700 mb-2">Session Expired</h2>
-              <p className="text-slate-600 mb-4">Your admin session has expired. Redirecting to login...</p>
-              <button onClick={onLogout} className="px-4 py-2 bg-slate-800 text-white rounded">Go to Login</button>
-            </div>
-          </div>
-        );
-      }
 
       if (loading) {
         return <div className="min-h-screen flex items-center justify-center text-slate-700">Loading admin console...</div>;
@@ -554,27 +468,6 @@
       const [password, setPassword] = useState('');
       const [error, setError] = useState('');
       const [loading, setLoading] = useState(false);
-
-      useEffect(() => {
-        // Check for existing session on mount
-        const checkSession = async () => {
-          const { data: { session } } = await supa.auth.getSession();
-          if (session) {
-            // Verify admin access
-            const { data: adminRow } = await supa
-              .from('admin_users')
-              .select('role')
-              .eq('user_id', session.user.id)
-              .single();
-            
-            if (adminRow) {
-              setAuthed(true);
-              setAdminUser(session.user);
-            }
-          }
-        };
-        checkSession();
-      }, []);
 
       const login = async (e) => {
         e.preventDefault();

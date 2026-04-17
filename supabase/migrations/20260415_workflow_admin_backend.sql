@@ -22,6 +22,7 @@ RETURNS BOOLEAN
 LANGUAGE sql
 STABLE
 SECURITY DEFINER
+SET search_path = public
 AS $$
   SELECT EXISTS (
     SELECT 1
@@ -142,7 +143,7 @@ VALUES
   ('spiritual-dating', 'Spiritual', 'Meditation, mindfulness, and inner peace', '🧘', 'dating', 0),
   ('traditional', 'Traditional', 'Value customs, family traditions, and cultural practices', '🏛️', 'matrimony', 0),
   ('modern', 'Modern', 'Progressive outlook, career-focused, urban lifestyle', '🌟', 'matrimony', 0),
-  ('spiritual-matrimony', 'Spiritual', 'Religious, meditative, and community-oriented', '🕉️', 'matrimony', 0),
+  ('spiritual-matrimony', 'Spiritual (Matrimony)', 'Religious, meditative, and community-oriented', '🕉️', 'matrimony', 0),
   ('academic', 'Academic', 'Education-focused, intellectual, research-minded', '🎓', 'matrimony', 0),
   ('creative', 'Creative', 'Artistic, innovative, and expressive', '🎭', 'matrimony', 0),
   ('adventurous', 'Adventurous', 'Risk-takers, explorers, and thrill-seekers', '🧗', 'matrimony', 0),
@@ -208,6 +209,11 @@ BEGIN
       UPDATE public.fish_trap_messages
       SET interaction_id = conversation_id
       WHERE interaction_id IS NULL
+        AND EXISTS (
+          SELECT 1
+          FROM public.fish_trap_interactions i
+          WHERE i.id = public.fish_trap_messages.conversation_id
+        )
     ';
   END IF;
 END $$;
@@ -216,6 +222,13 @@ END $$;
 DROP POLICY IF EXISTS "Admin only access to decoy profiles" ON public.decoy_profiles;
 DROP POLICY IF EXISTS "Admin only access to fish trap interactions" ON public.fish_trap_interactions;
 DROP POLICY IF EXISTS "Admin only access to fish trap messages" ON public.fish_trap_messages;
+DROP POLICY IF EXISTS "Users can view active decoy profiles" ON public.decoy_profiles;
+DROP POLICY IF EXISTS "Admins can manage decoy profiles" ON public.decoy_profiles;
+DROP POLICY IF EXISTS "Users can manage their fish trap interactions" ON public.fish_trap_interactions;
+DROP POLICY IF EXISTS "Admins can view fish trap interactions" ON public.fish_trap_interactions;
+DROP POLICY IF EXISTS "Users can view their fish trap messages" ON public.fish_trap_messages;
+DROP POLICY IF EXISTS "Users can insert their fish trap messages" ON public.fish_trap_messages;
+DROP POLICY IF EXISTS "Admins can view fish trap messages" ON public.fish_trap_messages;
 
 CREATE POLICY "Users can view active decoy profiles"
   ON public.decoy_profiles FOR SELECT
