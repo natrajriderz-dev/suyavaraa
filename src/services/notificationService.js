@@ -5,10 +5,16 @@ const { supabase } = require('../../supabase');
 
 class NotificationService {
   constructor() {
-    this.configure();
+    // Skip notification configuration on web
+    if (Platform.OS !== 'web') {
+      this.configure();
+    }
   }
 
   configure() {
+    // Skip on web
+    if (Platform.OS === 'web') return;
+    
     // Configure notification handler
     Notifications.setNotificationHandler({
       handleNotification: async () => ({
@@ -36,6 +42,9 @@ class NotificationService {
   }
 
   setupNotificationResponseListener() {
+    // Skip on web
+    if (Platform.OS === 'web') return;
+    
     // This listener is fired whenever a user taps on or interacts with a notification
     this.notificationResponseListener = Notifications.addNotificationResponseReceivedListener(
       (response) => {
@@ -142,6 +151,7 @@ class NotificationService {
   }
 
   async registerForPushNotifications(userId) {
+    if (Platform.OS === 'web') return null;
     const hasPermission = await this.requestPermissions();
     if (!hasPermission) {
       console.log('Push notification permission denied');
@@ -229,6 +239,69 @@ class NotificationService {
       },
       trigger: { seconds: secondsFromNow },
     });
+  }
+
+  // Database notifications
+  async getNotifications(userId) {
+    try {
+      const { data, error } = await supabase
+        .from('notifications')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(50);
+
+      if (error) throw error;
+      return data || [];
+    } catch (error) {
+      console.error('Error fetching notifications:', error);
+      return [];
+    }
+  }
+
+  async markAsRead(notificationId) {
+    try {
+      const { error } = await supabase
+        .from('notifications')
+        .update({ read_at: new Date().toISOString() })
+        .eq('id', notificationId);
+
+      if (error) throw error;
+      return true;
+    } catch (error) {
+      console.error('Error marking notification as read:', error);
+      return false;
+    }
+  }
+
+  async markAllAsRead(userId) {
+    try {
+      const { error } = await supabase
+        .from('notifications')
+        .update({ read_at: new Date().toISOString() })
+        .eq('user_id', userId)
+        .is('read_at', null);
+
+      if (error) throw error;
+      return true;
+    } catch (error) {
+      console.error('Error marking all notifications as read:', error);
+      return false;
+    }
+  }
+
+  subscribeToNotifications(userId, callback) {
+    return supabase
+      .channel(`notifications_${userId}`)
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'notifications',
+        filter: `user_id=eq.${userId}`
+      }, (payload) => {
+        callback(payload.new);
+      })
+      .subscribe();
   }
 
   // Notification types for different app events

@@ -20,7 +20,7 @@ const REACTIONS = [
   { type: 'love', icon: '❤️', color: Colors.love, label: 'Love' },
 ];
 
-const PostCard = ({ post, onReaction, onUserPress }) => {
+const PostCard = ({ post, onReaction, onUserPress, onReport }) => {
   const [showFullCaption, setShowFullCaption] = useState(false);
 
   const formatTime = (timestamp) => {
@@ -78,6 +78,11 @@ const PostCard = ({ post, onReaction, onUserPress }) => {
           </View>
         </View>
       </TouchableOpacity>
+      {onReport ? (
+        <TouchableOpacity style={styles.reportIconButton} onPress={() => onReport(post)}>
+          <Text style={styles.reportIconText}>⋯</Text>
+        </TouchableOpacity>
+      ) : null}
 
       {post.media_urls && post.media_urls.length > 0 && (
         <Image source={{ uri: post.media_urls[0] }} style={styles.postImage} />
@@ -102,6 +107,18 @@ const styles = StyleSheet.create({
   postHeader: { flexDirection: 'row', alignItems: 'center', padding: 12 },
   postAvatar: { width: 40, height: 40, borderRadius: 20, marginRight: 12 },
   postUserInfo: { flex: 1 },
+  reportIconButton: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.92)',
+  },
+  reportIconText: { color: Colors.text, fontSize: 18, fontWeight: '700' },
   postUserName: { fontSize: 16, fontWeight: 'bold', color: Colors.text },
   postUserMeta: { flexDirection: 'row', alignItems: 'center', marginTop: 2 },
   verifiedBadge: { backgroundColor: Colors.primary + '20', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8, marginLeft: 8 },

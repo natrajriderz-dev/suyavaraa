@@ -4,8 +4,12 @@
 
 const { supabase } = require('../../supabase');
 
-const DEEPSEEK_API_KEY = process.env.EXPO_PUBLIC_DEEPSEEK_API_KEY;
-const DEEPSEEK_BASE_URL = process.env.EXPO_PUBLIC_DEEPSEEK_BASE_URL || 'https://api.deepseek.com/v1';
+const DEEPSEEK_API_KEY =
+  process.env.EXPO_PUBLIC_DEEPSEEK_API_KEY || process.env.DEEPSEEK_API_KEY;
+const DEEPSEEK_BASE_URL =
+  process.env.EXPO_PUBLIC_DEEPSEEK_BASE_URL ||
+  process.env.DEEPSEEK_BASE_URL ||
+  'https://api.deepseek.com/v1';
 
 // Vision model for image analysis — DeepSeek-VL or compatible
 const VISION_MODEL = 'deepseek-vl-7b-chat';

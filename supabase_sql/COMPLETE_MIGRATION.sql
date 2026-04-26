@@ -59,6 +59,7 @@ CREATE TABLE IF NOT EXISTS public.users (
   trust_score INT DEFAULT 50,
   trust_level TEXT DEFAULT 'unverified',
   role TEXT DEFAULT 'user',
+  preferred_mode TEXT DEFAULT 'zone',
   is_premium BOOLEAN DEFAULT FALSE,
   premium_expires_at TIMESTAMP WITH TIME ZONE,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
@@ -66,6 +67,34 @@ CREATE TABLE IF NOT EXISTS public.users (
 );
 
 ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
+
+CREATE TABLE IF NOT EXISTS public.family_members (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  primary_user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  member_user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  role TEXT DEFAULT 'advisor',
+  can_message BOOLEAN DEFAULT TRUE,
+  is_active BOOLEAN DEFAULT TRUE,
+  linked_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+  UNIQUE (primary_user_id, member_user_id)
+);
+
+ALTER TABLE public.family_members ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Family members can be accessed by owner" ON public.family_members;
+CREATE POLICY "Family members can be accessed by owner"
+  ON public.family_members FOR SELECT
+  TO authenticated
+  USING (primary_user_id = auth.uid());
+
+DROP POLICY IF EXISTS "Family members owner manage own membership" ON public.family_members;
+CREATE POLICY "Family members owner manage own membership"
+  ON public.family_members FOR ALL
+  TO authenticated
+  USING (primary_user_id = auth.uid())
+  WITH CHECK (primary_user_id = auth.uid());
 
 DROP POLICY IF EXISTS "Users can view profiles" ON public.users;
 CREATE POLICY "Users can view profiles"
@@ -352,7 +381,7 @@ VALUES
   ('spiritual-dating', 'Spiritual', 'Meditation, mindfulness, and inner peace', '🧘', 'dating', 0),
   ('traditional', 'Traditional', 'Value customs, family traditions, and cultural practices', '🏛️', 'matrimony', 0),
   ('modern', 'Modern', 'Progressive outlook, career-focused, urban lifestyle', '🌟', 'matrimony', 0),
-  ('spiritual-matrimony', 'Spiritual', 'Religious, meditative, and community-oriented', '🕉️', 'matrimony', 0),
+  ('spiritual-matrimony', 'Spiritual Matrimony', 'Religious, meditative, and community-oriented', '🕉️', 'matrimony', 0),
   ('academic', 'Academic', 'Education-focused, intellectual, research-minded', '🎓', 'matrimony', 0),
   ('creative', 'Creative', 'Artistic, innovative, and expressive', '🎭', 'matrimony', 0),
   ('adventurous', 'Adventurous', 'Risk-takers, explorers, and thrill-seekers', '🧗', 'matrimony', 0),

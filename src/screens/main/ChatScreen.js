@@ -19,12 +19,14 @@ const { supabase } = require('../../../supabase');
 const Colors = require('../../theme/Colors');
 const MessageBubble = require('../../components/chat/MessageBubble');
 const ChatInput = require('../../components/chat/ChatInput');
+const { pickMedia, uploadMedia } = require('../../utils/mediaUtils');
 const fishTrapService = require('../../services/fishTrapService');
 const moderationService = require('../../services/moderationService');
 const notificationService = require('../../services/notificationService');
 
 const ChatScreen = ({ route, navigation }) => {
   const { conversationId, otherUser } = route.params;
+  const otherMember = otherUser || { profile_picture_url: null, display_name: 'Member' };
   const [messages, setMessages] = useState([]);
   const [inputText, setInputText] = useState('');
   const [loading, setLoading] = useState(true);
@@ -36,12 +38,17 @@ const ChatScreen = ({ route, navigation }) => {
   const [decoyInteraction, setDecoyInteraction] = useState(null);
   
   const flatListRef = useRef(null);
+  const messageChannelRef = useRef(null);
+  const typingChannelRef = useRef(null);
   const typingTimeoutRef = useRef(null);
 
   useEffect(() => {
     setupChat();
-    
-    // Subscribe to new messages
+  }, [conversationId]);
+
+  useEffect(() => {
+    if (!conversationId || !currentUserId) return;
+
     const messageSub = supabase
       .channel(`chat_${conversationId}`)
       .on('postgres_changes', {
@@ -66,12 +73,13 @@ const ChatScreen = ({ route, navigation }) => {
 
         // Send notification for incoming messages (not from current user)
         if (payload.new.sender_id !== currentUserId) {
-          notificationService.notifyMessage(otherUser, payload.new.content);
+          notificationService.notifyMessage(otherMember, payload.new.content);
         }
       })
       .subscribe();
 
-    // Subscribe to typing indicators using Presence
+    messageChannelRef.current = messageSub;
+
     const typingSub = supabase.channel(`typing_${conversationId}`)
       .on('presence', { event: 'sync' }, () => {
         const state = typingSub.presenceState();
@@ -80,15 +88,22 @@ const ChatScreen = ({ route, navigation }) => {
       })
       .subscribe();
 
+    typingChannelRef.current = typingSub;
+
     return () => {
-      supabase.removeChannel(messageSub);
-      supabase.removeChannel(typingSub);
+      if (messageChannelRef.current) supabase.removeChannel(messageChannelRef.current);
+      if (typingChannelRef.current) supabase.removeChannel(typingChannelRef.current);
     };
   }, [conversationId, currentUserId]);
 
   const setupChat = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (user) {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        setLoading(false);
+        return;
+      }
+
       setCurrentUserId(user.id);
 
       // Check if this is a decoy chat
@@ -99,9 +114,79 @@ const ChatScreen = ({ route, navigation }) => {
         loadDecoyMessages(interaction.id);
       } else {
         setIsDecoyChat(false);
-        loadMessages(user.id);
-        markAsRead(user.id);
+        await loadMessages(user.id);
+        await markAsRead(user.id);
       }
+    } catch (error) {
+      console.error('Chat setup error:', error);
+      setLoading(false);
+    }
+  };
+
+  const loadMessages = async (userId) => {
+    try {
+      const { data, error } = await supabase
+        .from('messages')
+        .select('id, sender_id, content, message_type, created_at, read_at')
+        .eq('match_id', conversationId)
+        .order('created_at', { ascending: true });
+
+      if (error) throw error;
+
+      setMessages((data || []).map((message) => ({
+        id: message.id,
+        sender_id: message.sender_id,
+        message_text: message.content,
+        message_type: message.message_type || 'text',
+        created_at: message.created_at,
+        read_at: message.read_at,
+      })));
+    } catch (error) {
+      console.error('Error loading messages:', error);
+      Alert.alert('Unable to load chat', 'Please try again later.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAttach = async () => {
+    if (sending || !currentUserId) return;
+    setSending(true);
+
+    try {
+      const picked = await pickMedia('library', true, 'image');
+      if (!picked || !picked.uri) return;
+
+      const fileName = picked.name || picked.uri.split('/').pop() || `photo-${Date.now()}.jpg`;
+      const extension = fileName.includes('.') ? fileName.split('.').pop() : 'jpg';
+      const filePath = `chat/${conversationId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${extension}`;
+
+      const uploadedUrl = await uploadMedia(picked.uri, 'avatars', filePath);
+      const { data, error } = await supabase
+        .from('messages')
+        .insert({
+          match_id: conversationId,
+          sender_id: currentUserId,
+          content: uploadedUrl,
+          message_type: 'image',
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      setMessages(prev => [...prev, {
+        id: data.id,
+        sender_id: currentUserId,
+        message_text: uploadedUrl,
+        message_type: 'image',
+        created_at: data.created_at,
+      }] );
+    } catch (error) {
+      console.error('Chat attachment error:', error);
+      Alert.alert('Attachment failed', error.message || 'Unable to send image');
+    } finally {
+      setSending(false);
     }
   };
 
@@ -228,10 +313,16 @@ const ChatScreen = ({ route, navigation }) => {
 
   const handleTyping = (text) => {
     setInputText(text);
+
+    if (!typingChannelRef.current && currentUserId && conversationId) {
+      const typingSub = supabase.channel(`typing_${conversationId}`);
+      typingSub.subscribe();
+      typingChannelRef.current = typingSub;
+    }
+
     if (!isTyping) {
       setIsTyping(true);
-      const typingSub = supabase.channel(`typing_${conversationId}`);
-      typingSub.track({ userId: currentUserId, isTyping: true });
+      typingChannelRef.current?.track?.({ userId: currentUserId, isTyping: true });
     }
 
     if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
@@ -240,8 +331,7 @@ const ChatScreen = ({ route, navigation }) => {
 
   const stopTyping = () => {
     setIsTyping(false);
-    const typingSub = supabase.channel(`typing_${conversationId}`);
-    typingSub.track({ userId: currentUserId, isTyping: false });
+    typingChannelRef.current?.track?.({ userId: currentUserId, isTyping: false });
   };
 
   const formatMessageTime = (ts) => {
@@ -251,6 +341,61 @@ const ChatScreen = ({ route, navigation }) => {
   const getStatus = (msg) => {
     if (msg.read_at) return { icon: '✓✓', color: Colors.read };
     return { icon: '✓', color: Colors.textMuted };
+  };
+
+  const reportOtherUser = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user || !otherUser?.id) throw new Error('Unable to identify the member');
+
+      const result = await moderationService.reportContent(
+        user.id,
+        otherUser.id,
+        'chat',
+        conversationId,
+        'Chat participant reported by member'
+      );
+
+      if (!result.success) throw new Error(result.error || 'Could not submit report');
+      Alert.alert('Report submitted', 'Our moderation team will review this conversation.');
+    } catch (error) {
+      Alert.alert('Unable to report', error.message || 'Please try again.');
+    }
+  };
+
+  const blockOtherUser = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user || !otherUser?.id) throw new Error('Unable to identify the member');
+
+      const { error } = await supabase.from('user_blocks').upsert({
+        blocker_id: user.id,
+        blocked_id: otherUser.id,
+        reason: 'Blocked from chat safety actions',
+      }, { onConflict: 'blocker_id,blocked_id' });
+
+      if (error) throw error;
+      Alert.alert('Member blocked', 'You can leave this chat. Future interactions from this member should be restricted.');
+    } catch (error) {
+      Alert.alert('Unable to block', error.message || 'Please try again.');
+    }
+  };
+
+  const openSafetyActions = () => {
+    Alert.alert(
+      'Chat Safety',
+      'Choose an action for this member.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'View Profile', onPress: () => navigation.navigate('MemberProfile', { userId: otherUser?.id, fallbackMember: {
+          id: otherUser?.id,
+          name: otherUser?.display_name,
+          photo: otherUser?.profile_picture_url || null,
+        } }) },
+        { text: 'Report User', onPress: reportOtherUser },
+        { text: 'Block User', style: 'destructive', onPress: blockOtherUser },
+      ]
+    );
   };
 
   if (loading) {
@@ -273,9 +418,9 @@ const ChatScreen = ({ route, navigation }) => {
         </TouchableOpacity>
         
         <View style={styles.userInfo}>
-          <Image source={{ uri: otherUser.profile_picture_url || 'https://via.placeholder.com/40' }} style={styles.avatar} />
+          <Image source={{ uri: otherMember.profile_picture_url || 'https://via.placeholder.com/40' }} style={styles.avatar} />
           <View>
-            <Text style={styles.userName}>{otherUser.display_name}</Text>
+            <Text style={styles.userName}>{otherMember.display_name}</Text>
             {otherUserTyping ? (
               <Text style={styles.typingText}>typing...</Text>
             ) : (
@@ -284,7 +429,7 @@ const ChatScreen = ({ route, navigation }) => {
           </View>
         </View>
 
-        <TouchableOpacity onPress={() => Alert.alert('Report', 'Report user?')}>
+        <TouchableOpacity onPress={openSafetyActions}>
           <Ionicons name="ellipsis-vertical" size={24} color={Colors.textSecondary} />
         </TouchableOpacity>
       </View>
@@ -310,7 +455,7 @@ const ChatScreen = ({ route, navigation }) => {
         value={inputText}
         onChangeText={handleTyping}
         onSend={sendMessage}
-        onAttach={() => Alert.alert('Add', 'Coming soon')}
+        onAttach={handleAttach}
         sending={sending}
       />
     </KeyboardAvoidingView>

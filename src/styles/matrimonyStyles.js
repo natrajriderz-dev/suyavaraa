@@ -11,10 +11,7 @@ const matrimonyStyles = StyleSheet.create({
     marginVertical: 8,
     overflow: 'hidden',
     // Shadow for iOS
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    boxShadow: '0px 2px 4px rgba(0,0,0,0.1)',
     // Shadow for Android
     elevation: 3,
     // Flex direction based on screen size

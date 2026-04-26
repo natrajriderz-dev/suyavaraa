@@ -7,6 +7,7 @@ const {
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
+  Alert,
 } = require('react-native');
 const { useEffect, useState } = React;
 const { Ionicons } = require('@expo/vector-icons');
@@ -16,13 +17,102 @@ const Colors = require('../../theme/Colors');
 const MemberProfileScreen = ({ route, navigation }) => {
   const { userId, fallbackMember } = route.params || {};
   const [member, setMember] = useState(fallbackMember || null);
-  const [loading, setLoading] = useState(!fallbackMember && !!userId);
+  const [loading, setLoading] = useState(true);
+  const [connectionStatus, setConnectionStatus] = useState('none'); // 'none', 'liked', 'received', 'matched'
+  const [matchId, setMatchId] = useState(null);
+  const [currentUserId, setCurrentUserId] = useState(null);
+
+  const handleReport = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user || !member?.id) throw new Error('Unable to identify the current member');
+
+      const { error } = await supabase.from('reports').insert({
+        reporter_id: user.id,
+        target_id: member.id,
+        content_type: 'user_account',
+        reason: 'Profile reported by member',
+        category: 'general',
+        severity: 'medium',
+        status: 'pending',
+      });
+
+      if (error) throw error;
+      Alert.alert('Report submitted', 'Thanks. Our moderation team will review this profile.');
+    } catch (error) {
+      Alert.alert('Unable to report', error.message || 'Please try again.');
+    }
+  };
+
+  const handleLike = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { error } = await supabase.from('user_actions').insert({
+        actor_user_id: user.id,
+        target_user_id: member.id,
+        action_type: 'like'
+      });
+
+      if (error) throw error;
+
+      // Check if match was created (mutual like)
+      if (connectionStatus === 'received') {
+        const { data: match } = await supabase
+          .from('matches')
+          .select('id')
+          .or(`and(user1_id.eq.${user.id},user2_id.eq.${member.id}),and(user1_id.eq.${member.id},user2_id.eq.${user.id})`)
+          .single();
+        
+        if (match) {
+          setMatchId(match.id);
+          setConnectionStatus('matched');
+          Alert.alert("It's a Match!", `You and ${member.name} can now chat.`);
+        } else {
+          setConnectionStatus('liked');
+        }
+      } else {
+        setConnectionStatus('liked');
+        Alert.alert("Interest Sent", `Your interest has been shared with ${member.name}.`);
+      }
+    } catch (error) {
+      console.error('Like error:', error);
+      Alert.alert('Error', 'Unable to send interest. Please try again.');
+    }
+  };
+
+  const handleBlock = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user || !member?.id) throw new Error('Unable to identify the current member');
+
+      const { error } = await supabase.from('user_blocks').upsert({
+        blocker_id: user.id,
+        blocked_id: member.id,
+        reason: 'Blocked from member profile',
+      }, { onConflict: 'blocker_id,blocked_id' });
+
+      if (error) throw error;
+      Alert.alert('Member blocked', 'You will no longer interact with this member from your account.');
+    } catch (error) {
+      Alert.alert('Unable to block', error.message || 'Please try again.');
+    }
+  };
 
   useEffect(() => {
-    if (!userId || fallbackMember) return;
+    loadData();
+  }, [userId]);
 
-    const loadMember = async () => {
-      try {
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      setCurrentUserId(user.id);
+
+      // Load member data
+      if (userId) {
         const { data, error } = await supabase
           .from('users')
           .select('id, full_name, city, bio, trust_score, user_profiles(primary_photo_url)')
@@ -39,15 +129,62 @@ const MemberProfileScreen = ({ route, navigation }) => {
           trust_score: data.trust_score,
           photo: data.user_profiles?.[0]?.primary_photo_url || null,
         });
-      } catch (error) {
-        console.error('Load member profile error:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
 
-    loadMember();
-  }, [fallbackMember, userId]);
+        // Check connection status
+        await checkConnection(user.id, userId);
+      }
+    } catch (error) {
+      console.error('Load data error:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const checkConnection = async (myId, otherId) => {
+    try {
+      // 1. Check for match
+      const { data: match } = await supabase
+        .from('matches')
+        .select('id')
+        .or(`and(user1_id.eq.${myId},user2_id.eq.${otherId}),and(user1_id.eq.${otherId},user2_id.eq.${myId})`)
+        .maybeSingle();
+
+      if (match) {
+        setConnectionStatus('matched');
+        setMatchId(match.id);
+        return;
+      }
+
+      // 2. Check for my like
+      const { data: myLike } = await supabase
+        .from('user_actions')
+        .select('id')
+        .eq('actor_user_id', myId)
+        .eq('target_user_id', otherId)
+        .eq('action_type', 'like')
+        .maybeSingle();
+
+      if (myLike) {
+        setConnectionStatus('liked');
+        return;
+      }
+
+      // 3. Check for their like
+      const { data: theirLike } = await supabase
+        .from('user_actions')
+        .select('id')
+        .eq('actor_user_id', otherId)
+        .eq('target_user_id', myId)
+        .eq('action_type', 'like')
+        .maybeSingle();
+
+      if (theirLike) {
+        setConnectionStatus('received');
+      }
+    } catch (error) {
+      console.error('Check connection error:', error);
+    }
+  };
 
   return (
     <View style={styles.container}>
@@ -80,6 +217,50 @@ const MemberProfileScreen = ({ route, navigation }) => {
           <Text style={styles.bio}>
             {member?.bio || 'This member has not added a bio yet.'}
           </Text>
+          {member?.id ? (
+            <View style={styles.connectionActions}>
+              {connectionStatus === 'matched' ? (
+                <TouchableOpacity 
+                  style={[styles.actionButton, styles.chatButton]} 
+                  onPress={() => navigation.navigate('Chat', { 
+                    conversationId: matchId, 
+                    otherUser: { id: member.id, display_name: member.name, profile_picture_url: member.photo } 
+                  })}
+                >
+                  <Ionicons name="chatbubbles" size={20} color="#fff" />
+                  <Text style={styles.actionButtonTextPrimary}>Message</Text>
+                </TouchableOpacity>
+              ) : connectionStatus === 'liked' ? (
+                <View style={[styles.actionButton, styles.disabledButton]}>
+                  <Ionicons name="checkmark-circle" size={20} color={Colors.textSecondary} />
+                  <Text style={styles.actionButtonText}>Interest Sent</Text>
+                </View>
+              ) : connectionStatus === 'received' ? (
+                <TouchableOpacity style={[styles.actionButton, styles.primaryButton]} onPress={handleLike}>
+                  <Ionicons name="heart" size={20} color="#fff" />
+                  <Text style={styles.actionButtonTextPrimary}>Accept Interest</Text>
+                </TouchableOpacity>
+              ) : (
+                <TouchableOpacity style={[styles.actionButton, styles.primaryButton]} onPress={handleLike}>
+                  <Ionicons name="heart-outline" size={20} color="#fff" />
+                  <Text style={styles.actionButtonTextPrimary}>Send Interest</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          ) : null}
+
+          {member?.id ? (
+            <View style={styles.actions}>
+              <TouchableOpacity style={styles.reportButton} onPress={handleReport}>
+                <Ionicons name="flag-outline" size={18} color={Colors.text} />
+                <Text style={styles.reportButtonText}>Report Profile</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.blockButton} onPress={handleBlock}>
+                <Ionicons name="hand-left-outline" size={18} color="#fff" />
+                <Text style={styles.blockButtonText}>Block Member</Text>
+              </TouchableOpacity>
+            </View>
+          ) : null}
         </ScrollView>
       )}
     </View>
@@ -112,7 +293,42 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   badgeText: { color: Colors.primary, fontWeight: '700', marginLeft: 8 },
-  bio: { color: Colors.textSecondary, fontSize: 15, lineHeight: 22, textAlign: 'center' },
+  bio: { color: Colors.textSecondary, fontSize: 15, lineHeight: 22, textAlign: 'center', marginBottom: 30 },
+  connectionActions: { width: '100%', marginBottom: 12 },
+  actionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    borderRadius: 14,
+    gap: 10,
+  },
+  primaryButton: { backgroundColor: Colors.primary },
+  chatButton: { backgroundColor: Colors.success },
+  disabledButton: { backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.border },
+  actionButtonText: { color: Colors.textSecondary, fontWeight: '700', fontSize: 16 },
+  actionButtonTextPrimary: { color: '#fff', fontWeight: '700', fontSize: 16 },
+  actions: { width: '100%', gap: 12 },
+  reportButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    borderRadius: 14,
+    backgroundColor: Colors.surface,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  reportButtonText: { marginLeft: 8, color: Colors.text, fontWeight: '600' },
+  blockButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    borderRadius: 14,
+    backgroundColor: '#EF4444',
+  },
+  blockButtonText: { marginLeft: 8, color: '#fff', fontWeight: '600' },
 });
 
 module.exports = MemberProfileScreen;

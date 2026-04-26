@@ -8,6 +8,7 @@ const {
   ScrollView,
   Alert,
   ActivityIndicator,
+  Switch,
 } = require('react-native');
 const { useState } = React;
 const AsyncStorage = require('@react-native-async-storage/async-storage').default;
@@ -24,6 +25,7 @@ const SignupScreen = ({ navigation }) => {
   const [error, setError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [acceptedPolicies, setAcceptedPolicies] = useState(false);
 
   const handleSignup = async () => {
     // Validation
@@ -47,6 +49,11 @@ const SignupScreen = ({ navigation }) => {
       return;
     }
 
+    if (!acceptedPolicies) {
+      setError('Please accept the Terms of Service and Privacy Policy');
+      return;
+    }
+
     setLoading(true);
     setError('');
 
@@ -58,7 +65,9 @@ const SignupScreen = ({ navigation }) => {
         options: {
           emailRedirectTo: 'suyavaraa://login-callback',
           data: {
-            email_confirmed: true // Auto-confirm email
+            email_confirmed: true, // Auto-confirm email
+            accepted_terms_at: new Date().toISOString(),
+            accepted_privacy_at: new Date().toISOString(),
           }
         }
       });
@@ -159,6 +168,30 @@ const SignupScreen = ({ navigation }) => {
         >
           <Ionicons name={showConfirmPassword ? 'eye' : 'eye-off'} size={20} color={Colors.textSecondary} />
         </TouchableOpacity>
+      </View>
+
+      <View style={{ flexDirection: 'row', alignItems: 'flex-start', marginBottom: 16 }}>
+        <Switch
+          value={acceptedPolicies}
+          onValueChange={setAcceptedPolicies}
+          trackColor={{ false: Colors.border, true: Colors.primary }}
+          thumbColor={Colors.surface}
+          style={{ marginRight: 10, marginTop: -2 }}
+        />
+        <View style={{ flex: 1 }}>
+          <Text style={{ color: Colors.text, fontSize: 14, lineHeight: 20 }}>
+            I agree to the Terms of Service and Privacy Policy.
+          </Text>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginTop: 6 }}>
+            <TouchableOpacity onPress={() => navigation.navigate('LegalDocument', { documentKey: 'terms' })}>
+              <Text style={{ color: Colors.primary, fontWeight: '600' }}>View Terms</Text>
+            </TouchableOpacity>
+            <Text style={{ color: Colors.textSecondary }}>  •  </Text>
+            <TouchableOpacity onPress={() => navigation.navigate('LegalDocument', { documentKey: 'privacy' })}>
+              <Text style={{ color: Colors.primary, fontWeight: '600' }}>View Privacy</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
       </View>
 
       {error ? <Text style={AuthStyles.errorText}>{error}</Text> : null}

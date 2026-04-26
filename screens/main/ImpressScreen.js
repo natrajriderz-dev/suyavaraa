@@ -210,6 +210,42 @@ const ImpressScreen = ({ navigation }) => {
     }
   };
 
+  const handleReportPost = async (post) => {
+    Alert.alert(
+      'Post Safety',
+      'Do you want to report this post to the moderation team?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Report',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const { data: { user } } = await supabase.auth.getUser();
+              if (!user) throw new Error('Not authenticated');
+
+              const { error } = await supabase.from('reports').insert({
+                reporter_id: user.id,
+                target_id: post.user_id,
+                content_type: 'post',
+                content_id: post.id,
+                reason: 'Post reported by member',
+                category: 'general',
+                severity: 'medium',
+                status: 'pending',
+              });
+
+              if (error) throw error;
+              Alert.alert('Report submitted', 'Thanks. Our moderation team will review this post.');
+            } catch (error) {
+              Alert.alert('Unable to report', error.message || 'Please try again.');
+            }
+          }
+        }
+      ]
+    );
+  };
+
   if (userMode === 'matrimony') {
     return (
       <View style={styles.emptyContainer}>
@@ -243,6 +279,7 @@ const ImpressScreen = ({ navigation }) => {
             post={item}
             onReaction={handleReaction}
             onUserPress={(userId) => navigation.navigate('Profile', { userId })}
+            onReport={handleReportPost}
           />
         )}
         keyExtractor={item => item.id}
@@ -274,7 +311,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
   header: { paddingHorizontal: 20, paddingTop: 50, paddingBottom: 16, backgroundColor: Colors.background },
   headerTitle: { fontSize: 24, fontWeight: 'bold', color: Colors.text },
-  fab: { position: 'absolute', right: 20, bottom: 20, width: 60, height: 60, borderRadius: 30, backgroundColor: Colors.primary, justifyContent: 'center', alignItems: 'center', elevation: 5, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.3, shadowRadius: 3 },
+  fab: { position: 'absolute', right: 20, bottom: 20, width: 60, height: 60, borderRadius: 30, backgroundColor: Colors.primary, justifyContent: 'center', alignItems: 'center', elevation: 5, boxShadow: '0px 2px 3px rgba(0,0,0,0.3)' },
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40 },
   emptyText: { fontSize: 20, fontWeight: 'bold', color: Colors.text, marginBottom: 12 },

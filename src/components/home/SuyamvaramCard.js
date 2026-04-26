@@ -31,7 +31,7 @@ const SuyamvaramCard = ({ profile, onLike, onPass, onDetail }) => {
         <View style={styles.header}>
           <Text style={styles.name}>{profile.display_name}, {profile.age}</Text>
           {profile.trust_level === 'green_verified' && (
-            <Ionicons name="checkmark-seal" size={24} color={Colors.primary} />
+            <Ionicons name="checkmark-circle" size={24} color={Colors.primary} />
           )}
         </View>
         
@@ -67,10 +67,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     alignSelf: 'center',
     elevation: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 5 },
-    shadowOpacity: 0.3,
-    shadowRadius: 10,
+    boxShadow: '0px 5px 10px rgba(0,0,0,0.3)',
   },
   image: {
     width: '100%',

@@ -1,12 +1,23 @@
 // src/components/video/CameraCapture.js
 const React = require('react');
 const { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Platform } = require('react-native');
-const ExpoCamera = require('expo-camera');
+
+// Conditional imports for native-only modules
+let ExpoCamera, CameraView;
+if (Platform.OS !== 'web') {
+  try {
+    const expoCameraModule = require('expo-camera');
+    ExpoCamera = expoCameraModule;
+    CameraView = expoCameraModule.CameraView || expoCameraModule.default || null;
+  } catch (e) {
+    console.warn('expo-camera not available:', e.message);
+    ExpoCamera = { requestCameraPermissionsAsync: () => ({ status: 'denied' }), requestMicrophonePermissionsAsync: () => ({ status: 'denied' }) };
+    CameraView = null;
+  }
+}
+
 const { Ionicons } = require('@expo/vector-icons');
 const Colors = require('../../theme/Colors');
-
-const Camera = ExpoCamera.Camera || ExpoCamera;
-const CameraView = ExpoCamera.CameraView || ExpoCamera.default || null;
 
 const WebCamera = ({ onCapture, instruction }) => {
   const videoRef = React.useRef(null);

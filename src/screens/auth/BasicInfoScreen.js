@@ -170,7 +170,8 @@ const BasicInfoScreen = ({ navigation, route }) => {
           date_of_birth: normalizedDob,
           gender: gender.toLowerCase(),
           city: city.trim(),
-          profile_complete: true
+          profile_complete: false,
+          onboarding_step: 'VideoVerification',
         }, {
           onConflict: 'id'
         });

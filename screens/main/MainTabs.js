@@ -9,7 +9,7 @@ const ChatStack = require('./ChatStack');
 const ImpressScreen = require('./ImpressScreen');
 const TribesStack = require('./TribesScreen');
 const ProfileStack = require('./ProfileStack');
-const AdminScreen = require('./AdminScreen');
+const AdminScreen = require('../shared/AdminScreen');
 const SuyamvaramScreen = require('../../src/screens/main/SuyamvaramScreen');
 
 const { useMode } = require('../../context/ModeContext');
@@ -17,9 +17,51 @@ const Colors = require('../../src/theme/Colors');
 
 const Tab = createBottomTabNavigator();
 
+const { useSafeAreaInsets } = require('react-native-safe-area-context');
+
+const { useState, useEffect } = React;
+const { supabase } = require('../../supabase');
+const notificationService = require('../../src/services/notificationService');
+
 const MainTabs = () => {
   const { userMode, activeMode, isPrivilegedOwner } = useMode();
+  const [unreadCount, setUnreadCount] = useState(0);
+  const insets = useSafeAreaInsets();
   const isAdminMode = activeMode === 'admin' && isPrivilegedOwner;
+
+  useEffect(() => {
+    loadUnreadCount();
+    
+    // Subscribe to new notifications
+    let subscription;
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user) {
+        subscription = notificationService.subscribeToNotifications(user.id, () => {
+          loadUnreadCount();
+        });
+      }
+    });
+
+    return () => {
+      if (subscription) supabase.removeChannel(subscription);
+    };
+  }, []);
+
+  const loadUnreadCount = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const { count } = await supabase
+        .from('notifications')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .is('read_at', null);
+      
+      setUnreadCount(count || 0);
+    } catch (e) {
+      console.error('Error loading unread count:', e);
+    }
+  };
 
   // Branding Colors matching the guide
   const activeColor = isAdminMode ? '#0f766e' : (activeMode === 'matrimony' ? '#D4A017' : '#E91E63'); // Teal for Admin
@@ -33,13 +75,10 @@ const MainTabs = () => {
           backgroundColor: '#ffffff', 
           borderTopWidth: 0.5, 
           borderTopColor: '#e5e5ea', 
-          height: 60,
-          paddingBottom: 8,
+          height: 60 + insets.bottom,
+          paddingBottom: insets.bottom > 0 ? insets.bottom : 8,
           elevation: 8,
-          shadowColor: '#000',
-          shadowOffset: { width: 0, height: -2 },
-          shadowOpacity: 0.1,
-          shadowRadius: 4,
+          boxShadow: '0px -2px 4px rgba(0,0,0,0.1)',
         },
         tabBarActiveTintColor: activeColor,
         tabBarInactiveTintColor: inactiveColor,
@@ -94,7 +133,9 @@ const MainTabs = () => {
           tabBarLabel: 'Matches', 
           tabBarIcon: ({ color, size, focused }) => (
             <Ionicons name={focused ? 'chatbubbles' : 'chatbubbles-outline'} size={24} color={color} />
-          )
+          ),
+          tabBarBadge: unreadCount > 0 ? unreadCount : null,
+          tabBarBadgeStyle: { backgroundColor: Colors.primary }
         }} 
       />
 

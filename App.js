@@ -13,8 +13,10 @@ const decoyRequestScheduler = require('./src/jobs/decoyRequestScheduler');
 // Navigation Stacks
 const AuthStack = require('./screens/auth/AuthStack');
 const OnboardingStack = require('./screens/onboarding/OnboardingStack');
-const MainTabs = require('./screens/main/MainTabs');
+const DatingTabs = require('./screens/dating/DatingTabs');
+const MatrimonyTabs = require('./screens/matrimony/MatrimonyTabs');
 const PremiumScreen = require('./src/screens/main/PremiumScreen');
+const { useMode } = require('./context/ModeContext');
 
 const Stack = createStackNavigator();
 
@@ -33,13 +35,18 @@ const App = () => {
     checkSession();
     
     const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_OUT') {
+        setInitialRoute('Auth');
+        if (navigationRef.isReady()) {
+          navigationRef.reset({ index: 0, routes: [{ name: 'Auth' }] });
+        }
+      }
       if (event === 'PASSWORD_RECOVERY') {
-        // User clicked the reset password link in their email
         setTimeout(() => {
           if (navigationRef.isReady()) {
             navigationRef.navigate('Auth', { screen: 'ResetPassword' });
           }
-        }, 500); // Slight delay to ensure navigation is mounted
+        }, 500);
       }
     });
 
@@ -55,62 +62,50 @@ const App = () => {
     try {
       console.log('Checking session...');
       const { data, error: sessionError } = await supabase.auth.getSession();
-      
       if (sessionError) throw sessionError;
-      
+
       const session = data?.session;
-      
-      if (session) {
-        console.log('Session found for user:', session.user.id);
-        const { data: profile, error: profileError } = await supabase
-          .from('users')
-          .select('profile_complete, verification_status')
-          .eq('id', session.user.id)
-          .single();
 
-        if (profileError) {
-          console.warn('Profile fetch error:', profileError);
-        }
-
-        const { data: modeProfile, error: modeError } = await supabase
-          .from('user_profiles')
-          .select('about')
-          .eq('user_id', session.user.id)
-          .single();
-
-        if (modeError) {
-          console.warn('Mode profile fetch error:', modeError);
-        }
-
-        if (!profile?.profile_complete) {
-          console.log('Profile incomplete, routing to BasicInfo');
-          setOnboardingScreen('BasicInfo');
-          setInitialRoute('Onboarding');
-        } else if (!profile?.verification_status || profile.verification_status === 'unverified') {
-          console.log('Unverified, routing to VideoVerification');
-          setOnboardingScreen('VideoVerification');
-          setInitialRoute('Onboarding');
-        } else if (!modeProfile?.about) {
-          console.log('No mode profile about text, routing to ModeSelect');
-          setOnboardingScreen('ModeSelect');
-          setInitialRoute('Onboarding');
-        } else {
-          console.log('Fully onboarded, routing to Main');
-          setInitialRoute('Main');
-          notificationService.registerForPushNotifications(session.user.id);
-        }
-
-        decoyRequestScheduler.start();
-      } else {
-        console.log('No session found, navigating to Auth');
+      if (!session) {
+        console.log('No session, routing to Auth');
         setInitialRoute('Auth');
+        return;
+      }
+
+      console.log('Session found for user:', session.user.id);
+
+      const { data: profile, error: profileError } = await supabase
+        .from('users')
+        .select('profile_complete, onboarding_step, role')
+        .eq('id', session.user.id)
+        .single();
+
+      if (profileError) {
+        console.warn('Profile fetch error:', profileError.message);
+      }
+
+      if (!profile?.profile_complete) {
+        const step = profile?.onboarding_step || 'BasicInfo';
+        console.log('Profile incomplete, routing to:', step);
+        setOnboardingScreen(step);
+        setInitialRoute('Onboarding');
+      } else {
+        console.log('Fully onboarded, routing to Main');
+        setInitialRoute('Main');
+        notificationService.registerForPushNotifications(session.user.id);
+      }
+
+      // Only start decoy scheduler for admins to avoid 403 errors for regular users
+      if (profile?.role === 'admin' || profile?.role === 'super_admin') {
+        console.log('Admin detected, starting decoy request scheduler');
+        decoyRequestScheduler.start();
       }
     } catch (error) {
       console.error('CRITICAL: Session check error:', error);
       setInitialRoute('Auth');
     } finally {
       setLoading(false);
-      console.log('Session check complete, loading set to false');
+      console.log('Session check complete');
     }
   };
 
@@ -134,7 +129,7 @@ const App = () => {
                 component={OnboardingStack} 
                 initialParams={{ screen: onboardingScreen }} 
               />
-              <Stack.Screen name="Main" component={MainTabs} />
+              <Stack.Screen name="Main" component={MainTabsRouter} />
               <Stack.Screen name="Premium" component={PremiumScreen} />
             </Stack.Navigator>
           </NavigationContainer>
@@ -144,15 +139,30 @@ const App = () => {
   );
 };
 
+const MainTabsRouter = () => {
+  const { activeMode } = useMode();
+  return activeMode === 'matrimony' ? <MatrimonyTabs /> : <DatingTabs />;
+};
+
 const appStyles = StyleSheet.create({
   webWrapper: {
     flex: 1,
     width: '100%',
-    maxWidth: Platform.OS === 'web' ? 500 : undefined,
+    maxWidth: Platform.OS === 'web' ? 600 : undefined,
     alignSelf: 'center',
     backgroundColor: '#000',
     overflow: 'hidden',
-    boxShadow: Platform.OS === 'web' ? '0px 0px 20px rgba(0,0,0,0.5)' : undefined,
+    boxShadow: Platform.OS === 'web' ? '0px 0px 30px rgba(0,0,0,0.6)' : undefined,
+  },
+  webContainer: {
+    flexDirection: Platform.OS === 'web' ? 'row' : 'column',
+  },
+  webSidebar: {
+    width: Platform.OS === 'web' ? 80 : 0,
+    backgroundColor: '#121212',
+  },
+  webContent: {
+    flex: 1,
   }
 });
 

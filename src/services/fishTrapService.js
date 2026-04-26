@@ -22,6 +22,35 @@ class FishTrapService {
     this.maxActiveDecoyChats = 3; // Max concurrent decoy chats per user
   }
 
+  classifyProfileMode(profile) {
+    const hasLookingFor = Boolean(profile.looking_for);
+    const hasMatrimonyTraits = Boolean(
+      profile.religion ||
+      profile.education ||
+      profile.occupation ||
+      profile.about
+    );
+
+    if (hasLookingFor) return 'dating';
+    if (hasMatrimonyTraits) return 'matrimony';
+    return null;
+  }
+
+  filterProfilesByMode(profiles, mode) {
+    if (!mode) return profiles;
+
+    return profiles.filter((profile) => {
+      const profileMode = this.classifyProfileMode(profile);
+      if (mode === 'dating') {
+        return profileMode === 'dating';
+      }
+      if (mode === 'matrimony') {
+        return profileMode === 'matrimony' || profileMode === null;
+      }
+      return true;
+    });
+  }
+
   // ============================================
   // QUARANTINE LOGIC
   // ============================================
@@ -54,22 +83,22 @@ class FishTrapService {
 
   // Get profiles for user (mixed real + decoy for unverified, real only for verified)
   async getProfilesForUser(userId, options = {}) {
-    const { limit = 20, offset = 0 } = options;
+    const { limit = 20, offset = 0, mode } = options;
 
     const inQuarantine = await this.isUserInQuarantine(userId);
 
     if (!inQuarantine) {
       // Verified user - show real profiles only
-      return await this.getRealProfiles(userId, { limit, offset });
+      return await this.getRealProfiles(userId, { limit, offset, mode });
     } else {
       // Unverified user - show mixed real + decoy profiles
-      return await this.getMixedProfiles(userId, { limit, offset });
+      return await this.getMixedProfiles(userId, { limit, offset, mode });
     }
   }
 
   // Get real profiles only (for verified users)
   async getRealProfiles(userId, options = {}) {
-    const { limit = 20, offset = 0 } = options;
+    const { limit = 20, offset = 0, mode } = options;
 
     try {
       const { data, error } = await supabase
@@ -78,6 +107,15 @@ class FishTrapService {
           id,
           user_id,
           primary_photo_url,
+          additional_photos,
+          interests,
+          religion,
+          education,
+          occupation,
+          about,
+          looking_for,
+          height_cm,
+          mother_tongue,
           users!inner (
             id,
             full_name,
@@ -86,11 +124,11 @@ class FishTrapService {
             city,
             bio,
             is_verified,
-            trust_score
+            trust_score,
+            is_banned
           )
         `)
         .neq('user_id', userId) // Exclude self
-        .eq('users.is_verified', true) // Only verified users
         .eq('users.is_banned', false) // Not banned
         .range(offset, offset + limit - 1);
 
@@ -104,19 +142,23 @@ class FishTrapService {
             profile.user_id
           );
 
+          const profileType = this.classifyProfileMode(profile);
           return {
             ...profile,
+            id: profile.user_id,
+            profile_type: profileType || 'dating',
+            user_id: profile.user_id,
             users: {
               ...profile.users,
               bio: scrubbedBio.scrubbedText
             },
             is_decoy: false,
-            can_send_request: true // Verified users can request anyone
+            can_send_request: true
           };
         })
       );
 
-      return scrubbedProfiles;
+      return mode ? this.filterProfilesByMode(scrubbedProfiles, mode) : scrubbedProfiles;
 
     } catch (error) {
       console.error('Error getting real profiles:', error);
@@ -126,13 +168,14 @@ class FishTrapService {
 
   // Get mixed real + decoy profiles (for unverified users)
   async getMixedProfiles(userId, options = {}) {
-    const { limit = 20, offset = 0 } = options;
+    const { limit = 20, offset = 0, mode } = options;
 
     try {
       // Get real profiles (limit to half)
       const realProfiles = await this.getRealProfiles(userId, {
         limit: Math.floor(limit / 2),
-        offset: offset
+        offset: offset,
+        mode
       });
 
       // Get decoy profiles (remaining slots)
@@ -172,6 +215,7 @@ class FishTrapService {
 
       return data.map(decoy => ({
         id: decoy.id,
+        decoy_id: decoy.id,
         user_id: decoy.user_id,
         primary_photo_url: decoy.profile_photo_url,
         users: {
@@ -184,7 +228,9 @@ class FishTrapService {
           is_verified: true, // Decoys appear verified
           trust_score: 95 // High trust score
         },
-        is_decoy: true
+        is_decoy: true,
+        profile_type: null,
+        can_send_request: true
       }));
 
     } catch (error) {

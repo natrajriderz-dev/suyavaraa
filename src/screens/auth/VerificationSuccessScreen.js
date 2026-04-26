@@ -4,8 +4,25 @@ const { View, Text, StyleSheet, TouchableOpacity, SafeAreaView } = require('reac
 const { Ionicons } = require('@expo/vector-icons');
 const Colors = require('../../theme/Colors');
 
+const { supabase } = require('../../../supabase');
+
 const VerificationSuccessScreen = ({ navigation }) => {
-  const handleContinue = () => {
+  const handleContinue = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        await supabase
+          .from('users')
+          .update({
+            onboarding_step: 'ModeSelect',
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', user.id);
+      }
+    } catch (error) {
+      console.error('Failed to update onboarding step:', error);
+    }
+
     navigation.replace('ModeSelect');
   };
 
@@ -54,10 +71,7 @@ const styles = StyleSheet.create({
     borderRadius: 18, 
     alignItems: 'center',
     elevation: 4,
-    shadowColor: Colors.primary,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
+    boxShadow: '0px 4px 8px rgba(217,119,6,0.2)',
   },
   primaryBtnText: { color: '#fff', fontSize: 18, fontWeight: 'bold' },
 });

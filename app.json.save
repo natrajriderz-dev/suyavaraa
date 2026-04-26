@@ -1,0 +1,53 @@
+
+  "expo": {
+    "name": "Suyavaraa",
+    "slug": "suyavaraa",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#000000"
+    },
+    "ios": {
+      "bundleIdentifier": "com.trusthub.suyavaraa",
+      "supportsTablet": true,
+      "infoPlist": {
+        "UIBackgroundModes": [
+          "remote-notification",
+          "remote-notification"
+        ],
+        "NSUserNotificationsUsageDescription": "This app uses notifications to alert you about new matches, messages, and important updates.",
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#121212"
+      },
+      "permissions": [
+        "android.permission.RECEIVE_BOOT_COMPLETED",
+        "android.permission.VIBRATE"
+      ],
+      "package": "com.trusthub.suyavaraa"
+    },
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "https": true,
+      "bundler": "metro"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "734b7d98-1899-4e5b-b837-be1bc567c233"
+      }
+    },
+    "plugins": [
+      "@react-native-community/datetimepicker"
+    ],
+    "owner": "natrajriderz"
+  }
+}
+

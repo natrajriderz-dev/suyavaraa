@@ -10,6 +10,7 @@ const LoginScreen = require('../../src/screens/auth/LoginScreen');
 const SignupScreen = require('../../src/screens/auth/SignupScreen');
 const ForgotPasswordScreen = require('../../src/screens/auth/ForgotPasswordScreen');
 const ResetPasswordScreen = require('../../src/screens/auth/ResetPasswordScreen');
+const LegalDocumentScreen = require('../../src/screens/shared/LegalDocumentScreen');
 
 const Stack = createStackNavigator();
 
@@ -21,7 +22,7 @@ const AuthStack = () => {
         headerStyle: {
           backgroundColor: Colors.background,
           elevation: 0,
-          shadowOpacity: 0,
+          
           borderBottomWidth: 0,
         },
         headerTintColor: Colors.text,
@@ -61,6 +62,11 @@ const AuthStack = () => {
         name="ResetPassword"
         component={ResetPasswordScreen}
         options={{ title: 'New Password', headerShown: false }}
+      />
+      <Stack.Screen
+        name="LegalDocument"
+        component={LegalDocumentScreen}
+        options={{ title: '' }}
       />
     </Stack.Navigator>
   );

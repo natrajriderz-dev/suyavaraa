@@ -8,8 +8,12 @@ const { supabase } = require('../../supabase');
 
 // IMPORTANT: API key should come from environment variables only
 // Remove the fallback key before production deployment
-const DEEPSEEK_API_KEY = process.env.EXPO_PUBLIC_DEEPSEEK_API_KEY;
-const DEEPSEEK_BASE_URL = process.env.EXPO_PUBLIC_DEEPSEEK_BASE_URL || 'https://api.deepseek.com/v1';
+const DEEPSEEK_API_KEY =
+  process.env.EXPO_PUBLIC_DEEPSEEK_API_KEY || process.env.DEEPSEEK_API_KEY;
+const DEEPSEEK_BASE_URL =
+  process.env.EXPO_PUBLIC_DEEPSEEK_BASE_URL ||
+  process.env.DEEPSEEK_BASE_URL ||
+  'https://api.deepseek.com/v1';
 
 class AIResponderService {
   constructor() {

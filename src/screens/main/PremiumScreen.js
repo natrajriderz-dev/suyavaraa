@@ -7,6 +7,7 @@ const {
   TouchableOpacity,
   ScrollView,
   Dimensions,
+  Platform,
 } = require('react-native');
 const { Ionicons } = require('@expo/vector-icons');
 const { LinearGradient } = require('expo-linear-gradient');
@@ -17,6 +18,10 @@ const { Alert } = require('react-native');
 const { width } = Dimensions.get('window');
 
 const PremiumScreen = ({ navigation }) => {
+  const purchaseUnavailableMessage =
+    Platform.OS === 'android'
+      ? 'Premium purchases are temporarily unavailable on Android while Google Play Billing and review requirements are being finalized.'
+      : 'Premium purchases are temporarily unavailable while payment compliance review is being completed.';
   const plans = [
     {
       id: 'monthly',
@@ -61,17 +66,13 @@ const PremiumScreen = ({ navigation }) => {
         ))}
         
         <TouchableOpacity 
-          style={[styles.selectBtn, { backgroundColor: plan.color[0] }]}
+          style={[styles.selectBtn, styles.selectBtnDisabled, { backgroundColor: plan.color[0] }]}
           onPress={async () => {
             const result = await paymentService.createCheckoutSession(plan.id);
-            if (result.success) {
-              Alert.alert('Payment Initialized', result.message);
-            } else {
-              Alert.alert('Error', result.error || 'Could not start payment process');
-            }
+            Alert.alert('Premium Preview', result.error || purchaseUnavailableMessage);
           }}
         >
-          <Text style={styles.selectBtnText}>Upgrade Now</Text>
+          <Text style={styles.selectBtnText}>Coming Soon</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -88,15 +89,15 @@ const PremiumScreen = ({ navigation }) => {
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <View style={styles.heroSection}>
-          <Text style={styles.heroTitle}>Level Up Your Love Life</Text>
-          <Text style={styles.heroSub}>Unlock the full architecture of Suyavaraa — Dating and Matrimony.</Text>
+          <Text style={styles.heroTitle}>Premium Preview</Text>
+          <Text style={styles.heroSub}>We are polishing premium access, billing, and policy flows before enabling purchases.</Text>
         </View>
 
         {plans.map(plan => <PlanCard key={plan.id} plan={plan} />)}
 
         <View style={styles.footer}>
-          <Text style={styles.footerText}>Secure Checkout • Cancel Anytime</Text>
-          <Text style={styles.footerSub}>Subscriptions will automatically renew unless canceled 24h before the end of the current period.</Text>
+          <Text style={styles.footerText}>Billing Temporarily Disabled</Text>
+          <Text style={styles.footerSub}>{purchaseUnavailableMessage}</Text>
         </View>
       </ScrollView>
     </View>
@@ -126,10 +127,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#eee',
     elevation: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
+    boxShadow: '0px 4px 10px rgba(0,0,0,0.1)',
   },
   recommendedCard: {
     borderColor: '#D97706',
@@ -161,6 +159,9 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     borderRadius: 16,
     alignItems: 'center',
+  },
+  selectBtnDisabled: {
+    opacity: 0.75,
   },
   selectBtnText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
   footer: { marginTop: 20, alignItems: 'center', paddingBottom: 40 },

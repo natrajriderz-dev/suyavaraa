@@ -4,6 +4,7 @@ const { createStackNavigator } = require('@react-navigation/stack');
 const Colors = require('../../src/theme/Colors');
 const MatchesListScreen = require('../../src/screens/main/MatchesListScreen');
 const ChatScreen = require('../../src/screens/main/ChatScreen');
+const MemberProfileScreen = require('../../src/screens/main/MemberProfileScreen');
 
 const Stack = createStackNavigator();
 
@@ -18,6 +19,7 @@ const ChatStack = () => {
     >
       <Stack.Screen name="MatchesList" component={MatchesListScreen} />
       <Stack.Screen name="Chat" component={ChatScreen} />
+      <Stack.Screen name="MemberProfile" component={MemberProfileScreen} />
     </Stack.Navigator>
   );
 };

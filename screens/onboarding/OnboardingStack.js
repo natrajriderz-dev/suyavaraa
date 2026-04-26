@@ -15,8 +15,17 @@ const {
   Platform
 } = require('react-native');
 const { createStackNavigator } = require('@react-navigation/stack');
-const ExpoCamera = require('expo-camera');
-const ExpoAV = require('expo-av');
+
+// Conditional imports for native-only modules
+let ExpoCamera, ExpoAV;
+if (Platform.OS !== 'web') {
+  try {
+    ExpoCamera = require('expo-camera');
+    ExpoAV = require('expo-av');
+  } catch (e) {
+    console.warn('expo-camera or expo-av not available:', e.message);
+  }
+}
 const { useState, useEffect, useRef } = React;
 const AsyncStorage = require('@react-native-async-storage/async-storage').default;
 const axios = require('axios');
@@ -47,20 +56,27 @@ const navigateToRootMain = (navigation) => {
   navigation.navigate('Main');
 };
 
-const markProfileComplete = async () => {
+const updateOnboardingStep = async (step, extraUpdates = {}) => {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
 
+  const updates = {
+    onboarding_step: step,
+    updated_at: new Date().toISOString(),
+    ...extraUpdates,
+  };
+
   const { error } = await supabase
     .from('users')
-    .update({
-      profile_complete: true,
-      updated_at: new Date().toISOString(),
-    })
+    .update(updates)
     .eq('id', user.id);
 
   if (error) throw error;
+  return user;
+};
 
+const markProfileComplete = async () => {
+  const user = await updateOnboardingStep('complete', { profile_complete: true });
   await AsyncStorage.setItem('onboarding_complete', 'true');
   return user;
 };
@@ -521,8 +537,10 @@ const ModeSelectScreen = ({ navigation }) => {
       await switchMode(selectedMode);
       
       if (selectedMode === 'dating') {
+        await updateOnboardingStep('DatingProfile');
         navigation.navigate('DatingProfile');
       } else if (selectedMode === 'matrimony') {
+        await updateOnboardingStep('MatrimonyProfile');
         navigation.navigate('MatrimonyProfile');
       } else {
         // Hybrid: Ask user to choose primary focus
@@ -530,8 +548,20 @@ const ModeSelectScreen = ({ navigation }) => {
           'Choose Primary Focus',
           'Would you like to focus more on dating or matrimony?',
           [
-            { text: 'Dating', onPress: () => navigation.navigate('DatingProfile') },
-            { text: 'Matrimony', onPress: () => navigation.navigate('MatrimonyProfile') },
+            {
+              text: 'Dating',
+              onPress: async () => {
+                await updateOnboardingStep('DatingProfile');
+                navigation.navigate('DatingProfile');
+              }
+            },
+            {
+              text: 'Matrimony',
+              onPress: async () => {
+                await updateOnboardingStep('MatrimonyProfile');
+                navigation.navigate('MatrimonyProfile');
+              }
+            },
           ]
         );
       }
@@ -673,6 +703,7 @@ const DatingProfileScreen = ({ navigation }) => {
         photos: photoUrls,
       };
       await AsyncStorage.setItem('datingProfile', JSON.stringify(profileData));
+      await updateOnboardingStep('TribeZoneSelect');
       
       navigation.navigate('TribeZoneSelect');
     } catch (error) {
@@ -864,6 +895,7 @@ const MatrimonyProfileScreen = ({ navigation }) => {
       };
       
       await AsyncStorage.setItem('matrimonyProfile', JSON.stringify(profileData));
+      await updateOnboardingStep('TribeZoneSelect');
       
       navigation.navigate('TribeZoneSelect');
     } catch (error) {
@@ -1172,7 +1204,7 @@ const OnboardingRouter = ({ navigation }) => {
 
       const { data: userData } = await supabase
         .from('users')
-        .select('full_name, verification_status')
+        .select('full_name, verification_status, profile_complete, onboarding_step')
         .eq('id', user.id)
         .single();
 
@@ -1186,18 +1218,12 @@ const OnboardingRouter = ({ navigation }) => {
         return;
       }
 
-      const { data: profile } = await supabase
-        .from('user_profiles')
-        .select('about')
-        .eq('user_id', user.id)
-        .single();
-
-      if (!profile?.about) {
-        navigation.replace('ModeSelect');
+      if (userData?.profile_complete) {
+        navigateToRootMain(navigation);
         return;
       }
 
-      navigation.replace('TribeZoneSelect');
+      navigation.replace(userData?.onboarding_step || 'ModeSelect');
     } catch (error) {
       console.log('Check progress error:', error);
       navigation.replace('BasicInfo');
@@ -1222,7 +1248,7 @@ const OnboardingStack = ({ route }) => {
         headerStyle: {
           backgroundColor: colors.background,
           elevation: 0,
-          shadowOpacity: 0,
+          
           borderBottomWidth: 0,
         },
         headerTintColor: colors.text,

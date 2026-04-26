@@ -17,7 +17,6 @@ const { supabase } = require('../../../supabase');
 const { useMode } = require('../../../context/ModeContext');
 const { checkIsAdmin } = require('../../config/privilegedAccess');
 const Colors = require('../../theme/Colors');
-const Colors = require('../../theme/Colors');
 const TribeCard = require('../../components/tribes/TribeCard');
 const MyTribeCard = require('../../components/tribes/MyTribeCard');
 

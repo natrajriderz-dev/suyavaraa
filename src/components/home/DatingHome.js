@@ -76,7 +76,8 @@ const DatingHome = ({ navigation }) => {
       // Get profiles using Fish Trap service (mixed real + decoy for unverified, real only for verified)
       const fishTrapProfiles = await fishTrapService.getProfilesForUser(user.id, {
         limit: 20,
-        offset: 0
+        offset: 0,
+        mode: 'dating'
       });
 
       if (fishTrapProfiles && fishTrapProfiles.length > 0) {
@@ -153,9 +154,10 @@ const DatingHome = ({ navigation }) => {
 
   const processSwipeAction = async (action, profile, userId) => {
     // Record the action
+    const targetId = profile.user_id || profile.id;
     await supabase.from('user_actions').insert({
       actor_user_id: userId,
-      target_user_id: profile.id,
+      target_user_id: targetId,
       action_type: action
     });
 
@@ -164,13 +166,13 @@ const DatingHome = ({ navigation }) => {
       const { data: mutual } = await supabase
         .from('user_actions')
         .select('id')
-        .eq('actor_user_id', profile.id)
+        .eq('actor_user_id', targetId)
         .eq('target_user_id', userId)
         .eq('action_type', 'like')
         .single();
 
       if (mutual) {
-        await supabase.from('matches').insert({ user1_id: userId, user2_id: profile.id });
+        await supabase.from('matches').insert({ user1_id: userId, user2_id: targetId });
         setMatchedProfile(profile);
         setShowMatch(true);
       }
@@ -178,7 +180,8 @@ const DatingHome = ({ navigation }) => {
 
     // If liking a decoy, start the decoy chat
     if (profile.is_decoy && action === 'like') {
-      const result = await fishTrapService.startDecoyChat(userId, profile.id);
+      const decoyId = profile.decoy_id || profile.id;
+      const result = await fishTrapService.startDecoyChat(userId, decoyId);
       if (result.success) {
         Alert.alert(
           'Chat Started!',

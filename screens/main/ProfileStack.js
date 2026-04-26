@@ -31,9 +31,14 @@ const { width } = Dimensions.get('window');
 const { useMode } = require('../../context/ModeContext');
 const PremiumScreen = require('../../src/screens/main/PremiumScreen');
 const notificationService = require('../../src/services/notificationService');
+const LegalDocumentScreen = require('../../src/screens/shared/LegalDocumentScreen');
+const SupportCenterScreen = require('../../src/screens/shared/SupportCenterScreen');
+const VideoVerificationScreen = require('../../src/screens/auth/VideoVerificationScreen');
+const FamilyAccountScreen = require('../matrimony/FamilyAccountScreen');
+const NotificationsScreen = require('../../src/screens/main/NotificationsScreen');
 const Stack = createStackNavigator();
 
-// Colors
+// Default colors
 const datingColors = {
   background: '#ffffff',
   surface: '#f9f9f9',
@@ -44,6 +49,9 @@ const datingColors = {
   textSecondary: '#6B7280',
   textMuted: '#9CA3AF',
   border: '#E5E5EA',
+  trustHigh: '#10B981',
+  trustMedium: '#F59E0B',
+  trustLow: '#EF4444',
 };
 
 const matrimonyColors = {
@@ -56,9 +64,11 @@ const matrimonyColors = {
   textSecondary: '#6B7280',
   textMuted: '#9CA3AF',
   border: '#E5E5EA',
+  trustHigh: '#10B981',
+  trustMedium: '#D97706',
+  trustLow: '#EF4444',
 };
 
-// Default colors (will be overridden based on mode in components)
 const colors = datingColors;
 
 // Styles
@@ -342,14 +352,7 @@ const styles = StyleSheet.create({
     color: colors.primary,
   },
   premiumBadge: {
-    backgroundColor: colors.gold + '20',
-    borderColor: colors.gold,
-  },
-  premiumText: {
-    color: colors.gold,
-  },
-  premiumBadge: {
-    backgroundColor: '#D97706' + '20',
+    backgroundColor: '#D9770620',
     borderColor: '#D97706',
   },
   premiumText: {
@@ -550,7 +553,7 @@ const styles = StyleSheet.create({
     width: 24,
     height: 24,
     borderRadius: 12,
-    backgroundColor: colors.error,
+    backgroundColor: '#EF4444',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -605,7 +608,7 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   dangerText: {
-    color: colors.error,
+    color: '#EF4444',
   },
   // Switch
   switch: {
@@ -829,8 +832,8 @@ const PremiumBanner = ({ onPress }) => {
           <Ionicons name="star" size={24} color="#fff" />
         </View>
         <View style={styles.premiumBannerTextContainer}>
-          <Text style={styles.premiumBannerTitle}>Unlock Everything</Text>
-          <Text style={styles.premiumBannerSubtitle}>Get Premium for both modes & more</Text>
+          <Text style={styles.premiumBannerTitle}>Premium Preview</Text>
+          <Text style={styles.premiumBannerSubtitle}>Billing is paused while release compliance is finalized</Text>
         </View>
         <Ionicons name="chevron-forward" size={20} color="#fff" />
       </LinearGradient>
@@ -865,6 +868,7 @@ const ProfileScreen = ({ navigation }) => {
   const { userMode, activeMode, switchMode, isPrivilegedOwner } = useMode();
   const [isPremium, setIsPremium] = useState(false);
   const [trustLevel, setTrustLevel] = useState('unverified');
+  const [preferredMode, setPreferredMode] = useState(null);
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({
     matches: 0,
@@ -890,21 +894,22 @@ const ProfileScreen = ({ navigation }) => {
     loadProfile();
   }, [userMode]);
 
+  const [selectedPhoto, setSelectedPhoto] = useState(null);
+
   const loadProfile = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      // Load user row + profile row
       const { data: userData } = await supabase
         .from('users')
-        .select('id, full_name, city, bio, is_premium, premium_expires_at, trust_level, trust_score, is_verified')
+        .select('id, full_name, city, bio, is_premium, premium_expires_at, trust_level, trust_score, is_verified, date_of_birth, preferred_mode')
         .eq('id', user.id)
         .single();
 
       const { data: profileData } = await supabase
         .from('user_profiles')
-        .select('primary_photo_url, additional_photos, occupation')
+        .select('primary_photo_url, additional_photos, occupation, interests, hobbies, languages, height_cm')
         .eq('user_id', user.id)
         .single();
 
@@ -912,10 +917,34 @@ const ProfileScreen = ({ navigation }) => {
         const isPremiumActive =
           userData.is_premium &&
           (!userData.premium_expires_at || new Date(userData.premium_expires_at) > new Date());
+        
+        // Calculate age from date_of_birth
+        const calculateAgeFromDOB = (dob) => {
+          if (!dob) return null;
+          const birthDate = new Date(dob);
+          const today = new Date();
+          let age = today.getFullYear() - birthDate.getFullYear();
+          const monthDiff = today.getMonth() - birthDate.getMonth();
+          if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+            age--;
+          }
+          return age;
+        };
+
+        // Format height from cm
+        const formatHeight = (cm) => {
+          if (!cm) return '';
+          const totalInches = Math.round(cm / 2.54);
+          const feet = Math.floor(totalInches / 12);
+          const inches = totalInches % 12;
+          return `${feet}'${inches}"`;
+        };
+
         setProfile({
           display_name: userData.full_name,
           bio: userData.bio,
           city: userData.city,
+          age: calculateAgeFromDOB(userData.date_of_birth) || 25,
           photos: profileData
             ? [profileData.primary_photo_url, ...(profileData.additional_photos || [])].filter(Boolean)
             : [],
@@ -923,28 +952,16 @@ const ProfileScreen = ({ navigation }) => {
           interests: profileData?.interests || [],
           hobbies: profileData?.hobbies || [],
           languages: profileData?.languages || [],
-          height: profileData?.height || '',
+          height: formatHeight(profileData?.height_cm),
+          trust_score: userData.trust_score || 75
         });
+        setPreferredMode(userData.preferred_mode || 'zone');
         setIsPremium(isPrivilegedOwner ? true : isPremiumActive);
         setTrustLevel(userData.trust_level || 'unverified');
         setCompletionPercentage(calculateCompletion(profileData, userData));
-        
-        // Persist minimal copy for other screens
-        await AsyncStorage.setItem('userData', JSON.stringify({
-          display_name: userData.full_name,
-          city: userData.city,
-          trust_level: userData.trust_level,
-          profile_picture_url: profileData?.primary_photo_url || null,
-          is_verified: userData.is_verified || false,
-        }));
-      } else {
-        // Fallback to AsyncStorage cache while DB is being set up
-        const cached = await AsyncStorage.getItem('userData');
-        if (cached) setProfile(JSON.parse(cached));
       }
 
-      // Real stats from DB
-      const [{ count: matchCount }, { count: likeCount }] = await Promise.all([
+      const [matchesRes, likesRes, viewsRes] = await Promise.all([
         supabase
           .from('matches')
           .select('id', { count: 'exact', head: true })
@@ -954,18 +971,26 @@ const ProfileScreen = ({ navigation }) => {
           .select('id', { count: 'exact', head: true })
           .eq('target_user_id', user.id)
           .eq('action_type', 'like'),
+        supabase
+          .from('profile_views')
+          .select('id', { count: 'exact', head: true })
+          .eq('viewed_id', user.id),
       ]);
 
+      if (matchesRes.error || likesRes.error || viewsRes.error) {
+        console.warn(
+          'Stats fetch warning:',
+          matchesRes.error?.message || likesRes.error?.message || viewsRes.error?.message
+        );
+      }
+
       setStats({
-        matches: matchCount || 0,
-        likes: likeCount || 0,
-        views: 0 // Views tracking not yet implemented
+        matches: matchesRes.count ?? 0,
+        likes: likesRes.count ?? 0,
+        views: viewsRes.count ?? 0,
       });
     } catch (error) {
       console.error('Load profile error:', error);
-      // Fallback to cache
-      const cached = await AsyncStorage.getItem('userData');
-      if (cached) setProfile(JSON.parse(cached));
     } finally {
       setLoading(false);
     }
@@ -994,11 +1019,11 @@ const ProfileScreen = ({ navigation }) => {
 
     if (!isPremium) {
       Alert.alert(
-        'Premium Required',
-        'Switching between Dating and Matrimony modes is a Premium feature. Upgrade now to access both experiences.',
+        'Premium Preview',
+        'Premium purchases are temporarily unavailable while billing and release compliance are being finalized.',
         [
-          { text: 'Later', style: 'cancel' },
-          { text: 'Upgrade Now', onPress: () => navigation.navigate('Premium') }
+          { text: 'OK', style: 'cancel' },
+          { text: 'View Preview', onPress: () => navigation.navigate('Premium') }
         ]
       );
       return;
@@ -1008,7 +1033,6 @@ const ProfileScreen = ({ navigation }) => {
     setShowSwitcher(false);
     Alert.alert('Success', `Switched to ${targetMode === 'dating' ? 'Dating' : 'Matrimony'} mode`);
   };
-
 
   const getTrustScoreColor = (score) => {
     if (score >= 80) return colors.trustHigh;
@@ -1024,8 +1048,12 @@ const ProfileScreen = ({ navigation }) => {
     );
   }
 
-  // Show premium UI
   const isUnverified = trustLevel === 'unverified' || trustLevel === 'pending';
+
+  // Redirect unverified users to FishTrap profile
+  if (isUnverified && !isPremium) {
+    return <FishTrapProfileScreen navigation={navigation} />;
+  }
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -1037,77 +1065,74 @@ const ProfileScreen = ({ navigation }) => {
         isPremium={isPremium}
         canUseAdminMode={isPrivilegedOwner}
       />
-      <View style={[styles.header, { borderBottomColor: colors.border }]}>
-        <Text style={styles.headerTitle}>Profile</Text>
+      
+      {/* Photo Viewer Modal */}
+      <Modal visible={!!selectedPhoto} transparent animationType="fade">
         <TouchableOpacity 
-          style={styles.headerIcon}
-          onPress={() => navigation.navigate('Settings')}
+          style={styles.modalOverlay} 
+          activeOpacity={1} 
+          onPress={() => setSelectedPhoto(null)}
         >
-          <Ionicons name="settings-outline" size={24} color={colors.text} />
+          <Image source={{ uri: selectedPhoto }} style={{ width: width, height: width * 1.5, resizeMode: 'contain' }} />
+          <TouchableOpacity 
+            style={{ position: 'absolute', top: 50, right: 20 }}
+            onPress={() => setSelectedPhoto(null)}
+          >
+            <Ionicons name="close-circle" size={40} color="#fff" />
+          </TouchableOpacity>
         </TouchableOpacity>
+      </Modal>
+
+      <View style={[styles.header, { borderBottomColor: colors.border, paddingTop: Platform.OS === 'ios' ? 60 : 40 }]}>
+        <Text style={styles.headerTitle}>Profile</Text>
+        <View style={{ flexDirection: 'row', gap: 12 }}>
+          <TouchableOpacity 
+            style={styles.headerIcon}
+            onPress={() => navigation.navigate('Notifications')}
+          >
+            <Ionicons name="notifications-outline" size={24} color={colors.text} />
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={styles.headerIcon}
+            onPress={() => navigation.navigate('Settings')}
+          >
+            <Ionicons name="settings-outline" size={24} color={colors.text} />
+          </TouchableOpacity>
+        </View>
       </View>
 
       <ScrollView 
         contentContainerStyle={styles.scrollContainer}
         showsVerticalScrollIndicator={false}
       >
-        {/* Verification Warning for Unverified Users */}
-        {isUnverified && (
-          <TouchableOpacity 
-            style={[styles.warningBanner, { backgroundColor: colors.primary + '15' }]}
-            onPress={() => navigation.navigate('Verification')}
-          >
-            <View style={[styles.warningIcon, { backgroundColor: colors.primary }]}>
-              <Ionicons name="shield-alert" size={20} color="#fff" />
-            </View>
-            <View style={{ flex: 1, marginLeft: 12 }}>
-              <Text style={[styles.warningTitle, { color: colors.primary }]}>Verification Pending</Text>
-              <Text style={styles.warningSubtitle}>Verify your profile to boost visibility & trust</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={18} color={colors.primary} />
-          </TouchableOpacity>
-        )}
-
-        {/* Profile Photos with Gradient Overlay */}
-        <View style={styles.premiumPhotoSection}>
-          <ScrollView horizontal pagingEnabled showsHorizontalScrollIndicator={false}>
-            {profile?.photos?.length > 0 ? (
-              profile.photos.map((photo, index) => (
-                <View key={index} style={{ width: width }}>
-                  <Image source={{ uri: photo }} style={styles.premiumMainPhoto} />
-                </View>
-              ))
-            ) : (
-              <View style={[styles.premiumMainPhoto, { backgroundColor: colors.surface, justifyContent: 'center', alignItems: 'center', width: width }]}>
-                <Ionicons name="camera" size={60} color={colors.textMuted} />
-              </View>
-            )}
-          </ScrollView>
-          <LinearGradient
-            colors={['transparent', 'rgba(0,0,0,0.8)']}
-            style={styles.photoGradient}
-          />
-          <View style={styles.photoPaging}>
-            {profile?.photos?.map((_, i) => (
-              <View key={i} style={[styles.pagingDot, { backgroundColor: i === 0 ? colors.primary : 'rgba(255,255,255,0.5)' }]} />
-            ))}
-          </View>
-        </View>
-
-        {/* Profile Info Card */}
-        <View style={styles.premiumInfoCard}>
-          <View style={styles.completionContainer}>
-            <View style={styles.completionHeader}>
-              <Text style={styles.completionText}>Profile Strength</Text>
-              <Text style={[styles.completionPercentage, { color: colors.primary }]}>{completionPercentage}%</Text>
-            </View>
-            <View style={styles.completionBarBackground}>
-              <View style={[styles.completionBarFill, { width: `${completionPercentage}%`, backgroundColor: colors.primary }]} />
-            </View>
-          </View>
-
-        {/* Profile Info */}
         <View style={styles.profileInfo}>
+          {completionPercentage < 100 && (
+            <View style={styles.completionContainer}>
+              <View style={styles.completionHeader}>
+                <Text style={styles.completionText}>Profile Completion</Text>
+                <Text style={[styles.completionPercentage, { color: colors.primary }]}>
+                  {completionPercentage}%
+                </Text>
+              </View>
+              <View style={styles.completionBarBackground}>
+                <View
+                  style={[
+                    styles.completionBarFill,
+                    {
+                      width: `${completionPercentage}%`,
+                      backgroundColor: colors.primary,
+                    },
+                  ]}
+                />
+              </View>
+              <TouchableOpacity onPress={() => navigation.navigate('EditProfile')}>
+                <Text style={{ fontSize: 12, color: colors.primary, marginTop: 6 }}>
+                  Complete your profile to get more matches →
+                </Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
           <View style={styles.nameRow}>
             <Text style={styles.profileName}>{profile?.display_name || 'User'}</Text>
             <Text style={styles.profileAge}>{profile?.age || 25}</Text>
@@ -1115,7 +1140,7 @@ const ProfileScreen = ({ navigation }) => {
 
           <View style={styles.profileLocation}>
             <Ionicons name="location" size={16} color={colors.textSecondary} />
-            <Text style={[styles.bioText, { marginLeft: 4 }]}>
+            <Text style={[styles.bioText, { marginLeft: 4, color: colors.textSecondary }]}>
               {profile?.city || 'Location not set'}
             </Text>
           </View>
@@ -1124,21 +1149,35 @@ const ProfileScreen = ({ navigation }) => {
             <PremiumBanner onPress={() => navigation.navigate('Premium')} />
           )}
 
+          {/* Photos Grid (Small Icons) */}
+          <View style={{ marginBottom: 20 }}>
+            <Text style={[styles.bioTitle, { marginBottom: 12 }]}>Photos</Text>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
+              {profile?.photos?.length > 0 ? (
+                profile.photos.map((photo, index) => (
+                  <TouchableOpacity key={index} onPress={() => setSelectedPhoto(photo)}>
+                    <Image source={{ uri: photo }} style={{ width: 80, height: 80, borderRadius: 12 }} />
+                  </TouchableOpacity>
+                ))
+              ) : (
+                <TouchableOpacity 
+                  style={{ width: 80, height: 80, borderRadius: 12, backgroundColor: colors.surface, justifyContent: 'center', alignItems: 'center', borderStyle: 'dashed', borderWidth: 1, borderColor: colors.border }}
+                  onPress={() => navigation.navigate('EditProfile')}
+                >
+                  <Ionicons name="add" size={30} color={colors.textMuted} />
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
+
           {/* Badges */}
           <View style={styles.badgesContainer}>
-            <View style={[styles.badge, effectiveMode === 'dating' ? styles.badgePrimary : null]}>
+            <View style={[styles.badge, { backgroundColor: colors.primary + '15', borderColor: colors.primary }]}>
               <Text>{activeMode === 'admin' ? '🛡️' : (effectiveMode === 'dating' ? '💘' : '💍')}</Text>
-              <Text style={[styles.badgeText, effectiveMode === 'dating' ? styles.badgeTextPrimary : null]}>
+              <Text style={[styles.badgeText, { color: colors.primary, fontWeight: 'bold' }]}>
                 {activeMode === 'admin' ? 'Admin' : (effectiveMode === 'dating' ? 'Dating' : 'Matrimony')}
               </Text>
             </View>
-
-            {profile?.tribes?.map((tribe, index) => (
-              <View key={index} style={styles.badge}>
-                <Text>🏷️</Text>
-                <Text style={styles.badgeText}>{tribe.name}</Text>
-              </View>
-            ))}
 
             {isPremium && (
               <View style={[styles.badge, styles.premiumBadge]}>
@@ -1148,15 +1187,15 @@ const ProfileScreen = ({ navigation }) => {
             )}
 
             {trustLevel === 'green_verified' && (
-              <View style={[styles.badge, styles.badgePrimary]}>
+              <View style={[styles.badge, { backgroundColor: '#10B98115', borderColor: '#10B981' }]}>
                 <Text>✅</Text>
-                <Text style={[styles.badgeText, styles.badgeTextPrimary]}>Verified</Text>
+                <Text style={[styles.badgeText, { color: '#10B981', fontWeight: 'bold' }]}>Verified</Text>
               </View>
             )}
           </View>
 
           {/* Trust Score */}
-          <View style={styles.trustScoreContainer}>
+          <View style={[styles.trustScoreContainer, { borderColor: colors.border }]}>
             <View style={styles.trustScoreHeader}>
               <Text style={styles.trustScoreTitle}>Trust Score</Text>
               <Text style={[styles.trustScoreValue, { color: getTrustScoreColor(profile?.trust_score || 75) }]}>
@@ -1164,7 +1203,7 @@ const ProfileScreen = ({ navigation }) => {
               </Text>
             </View>
             <View style={styles.trustScoreBar}>
-              <View style={[styles.trustScoreFill, { width: `${profile?.trust_score || 75}%` }]} />
+              <View style={[styles.trustScoreFill, { width: `${profile?.trust_score || 75}%`, backgroundColor: colors.primary }]} />
             </View>
             <View style={styles.trustScoreLevels}>
               <Text style={styles.trustLevelText}>Basic</Text>
@@ -1176,29 +1215,29 @@ const ProfileScreen = ({ navigation }) => {
           {/* Bio */}
           <View style={styles.bioContainer}>
             <Text style={styles.bioTitle}>About Me</Text>
-            <Text style={styles.bioText}>
+            <Text style={[styles.bioText, { color: colors.textSecondary }]}>
               {profile?.bio || 'No bio added yet. Tell others about yourself!'}
             </Text>
           </View>
 
-          {/* Detailed Info */}
+          {/* Details */}
           <View style={styles.detailsGrid}>
             {profile?.occupation ? (
-              <View style={styles.detailItem}>
+              <View style={[styles.detailItem, { backgroundColor: colors.surface }]}>
                 <Ionicons name="briefcase-outline" size={18} color={colors.primary} />
-                <Text style={styles.detailText}>{profile.occupation}</Text>
+                <Text style={[styles.detailText, { color: colors.text }]}>{profile.occupation}</Text>
               </View>
             ) : null}
             {profile?.height ? (
-              <View style={styles.detailItem}>
+              <View style={[styles.detailItem, { backgroundColor: colors.surface }]}>
                 <Ionicons name="resize-outline" size={18} color={colors.primary} />
-                <Text style={styles.detailText}>{profile.height}</Text>
+                <Text style={[styles.detailText, { color: colors.text }]}>{profile.height}</Text>
               </View>
             ) : null}
             {profile?.languages?.length > 0 ? (
-              <View style={styles.detailItem}>
+              <View style={[styles.detailItem, { backgroundColor: colors.surface }]}>
                 <Ionicons name="language-outline" size={18} color={colors.primary} />
-                <Text style={styles.detailText}>{profile.languages.join(', ')}</Text>
+                <Text style={[styles.detailText, { color: colors.text }]}>{profile.languages.join(', ')}</Text>
               </View>
             ) : null}
           </View>
@@ -1231,28 +1270,28 @@ const ProfileScreen = ({ navigation }) => {
           )}
 
           {/* Stats */}
-          <View style={styles.statsContainer}>
+          <View style={[styles.statsContainer, { borderTopColor: colors.border, borderBottomColor: colors.border }]}>
             <View style={styles.statItem}>
-              <Text style={styles.statNumber}>{stats.matches}</Text>
+              <Text style={[styles.statNumber, { color: colors.text }]}>{stats.matches}</Text>
               <Text style={styles.statLabel}>Matches</Text>
             </View>
             <View style={styles.statItem}>
-              <Text style={styles.statNumber}>{stats.likes}</Text>
+              <Text style={[styles.statNumber, { color: colors.text }]}>{stats.likes}</Text>
               <Text style={styles.statLabel}>Likes</Text>
             </View>
             <View style={styles.statItem}>
-              <Text style={styles.statNumber}>{stats.views}</Text>
+              <Text style={[styles.statNumber, { color: colors.text }]}>{stats.views}</Text>
               <Text style={styles.statLabel}>Profile Views</Text>
             </View>
           </View>
 
           {/* Action Buttons */}
           <TouchableOpacity 
-            style={[styles.actionButton, styles.actionButtonPrimary]}
+            style={[styles.actionButton, { backgroundColor: colors.primary, borderColor: colors.primary }]}
             onPress={() => navigation.navigate('EditProfile')}
           >
-            <Ionicons name="create-outline" size={20} color={colors.text} />
-            <Text style={[styles.actionButtonText, styles.actionButtonTextPrimary]}>
+            <Ionicons name="create-outline" size={20} color="#fff" />
+            <Text style={[styles.actionButtonText, { color: '#fff', fontWeight: 'bold' }]}>
               Edit Profile
             </Text>
           </TouchableOpacity>
@@ -1286,6 +1325,10 @@ const EditProfileScreen = ({ navigation }) => {
   const [hobbies, setHobbies] = useState('');
   const [languages, setLanguages] = useState('');
   const [height, setHeight] = useState('');
+  const [religion, setReligion] = useState('');
+  const [education, setEducation] = useState('');
+  const [motherTongue, setMotherTongue] = useState('');
+  const [about, setAbout] = useState('');
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -1305,7 +1348,7 @@ const EditProfileScreen = ({ navigation }) => {
 
       const { data: profileData } = await supabase
         .from('user_profiles')
-        .select('primary_photo_url, additional_photos, occupation')
+        .select('primary_photo_url, additional_photos, occupation, interests, hobbies, languages, height_cm, religion, education, mother_tongue, about')
         .eq('user_id', user.id)
         .single();
 
@@ -1324,7 +1367,11 @@ const EditProfileScreen = ({ navigation }) => {
         setInterests(profileData.interests?.join(', ') || '');
         setHobbies(profileData.hobbies?.join(', ') || '');
         setLanguages(profileData.languages?.join(', ') || '');
-        setHeight(profileData.height || '');
+        setHeight(profileData.height_cm ? String(profileData.height_cm) : '');
+        setReligion(profileData.religion || '');
+        setEducation(profileData.education || '');
+        setMotherTongue(profileData.mother_tongue || '');
+        setAbout(profileData.about || '');
       }
     } catch (error) {
       console.error('Load profile error:', error);
@@ -1399,7 +1446,6 @@ const EditProfileScreen = ({ navigation }) => {
       // Update users table
       await supabase.from('users').upsert({
         id: user.id,
-        email: user.email,
         full_name: displayName,
         bio,
         city,
@@ -1418,6 +1464,9 @@ const EditProfileScreen = ({ navigation }) => {
         throw new Error('User record not found after upsert — cannot update profile');
       }
 
+      // Parse height_cm to integer
+      const heightCmParsed = height ? parseInt(height, 10) : null;
+
       // Upsert user_profiles table
       await supabase.from('user_profiles').upsert({
         user_id: user.id,
@@ -1427,7 +1476,11 @@ const EditProfileScreen = ({ navigation }) => {
         interests: interests.split(',').map(i => i.trim()).filter(Boolean),
         hobbies: hobbies.split(',').map(i => i.trim()).filter(Boolean),
         languages: languages.split(',').map(i => i.trim()).filter(Boolean),
-        height,
+        height_cm: heightCmParsed,
+        religion: religion || null,
+        education: education || null,
+        mother_tongue: motherTongue || null,
+        about: about || null,
       }, { onConflict: 'user_id' });
 
       // Safety scan for profile photos: deepfake + sexual imagery detection
@@ -1459,6 +1512,10 @@ const EditProfileScreen = ({ navigation }) => {
         city,
         photos: uploadedPhotos,
         profile_picture_url: primaryPhoto || null,
+        religion,
+        education,
+        mother_tongue: motherTongue,
+        height_cm: heightCmParsed,
       }));
 
       Alert.alert('Success', 'Profile updated successfully');
@@ -1580,14 +1637,57 @@ const EditProfileScreen = ({ navigation }) => {
           placeholderTextColor={colors.textSecondary}
         />
 
-        {/* Height */}
-        <Text style={styles.inputLabel}>Height</Text>
+        {/* Height (cm) */}
+        <Text style={styles.inputLabel}>Height (cm)</Text>
         <TextInput
           style={styles.input}
           value={height}
           onChangeText={setHeight}
-          placeholder="e.g. 5'8\""
+          placeholder="e.g. 170"
           placeholderTextColor={colors.textSecondary}
+          keyboardType="number-pad"
+        />
+
+        {/* Religion */}
+        <Text style={styles.inputLabel}>Religion</Text>
+        <TextInput
+          style={styles.input}
+          value={religion}
+          onChangeText={setReligion}
+          placeholder="e.g. Hindu, Muslim, Christian"
+          placeholderTextColor={colors.textSecondary}
+        />
+
+        {/* Education */}
+        <Text style={styles.inputLabel}>Education</Text>
+        <TextInput
+          style={styles.input}
+          value={education}
+          onChangeText={setEducation}
+          placeholder="e.g. Bachelor's in Engineering"
+          placeholderTextColor={colors.textSecondary}
+        />
+
+        {/* Mother Tongue */}
+        <Text style={styles.inputLabel}>Mother Tongue</Text>
+        <TextInput
+          style={styles.input}
+          value={motherTongue}
+          onChangeText={setMotherTongue}
+          placeholder="e.g. Tamil, Hindi, English"
+          placeholderTextColor={colors.textSecondary}
+        />
+
+        {/* About (extended bio) */}
+        <Text style={styles.inputLabel}>About</Text>
+        <TextInput
+          style={[styles.input, styles.textArea]}
+          value={about}
+          onChangeText={setAbout}
+          placeholder="Tell more about yourself, your values, what you're looking for..."
+          placeholderTextColor={colors.textSecondary}
+          multiline
+          numberOfLines={4}
         />
 
         {/* Save Button */}
@@ -1622,16 +1722,40 @@ const SettingsScreen = ({ navigation }) => {
 
   useEffect(() => {
     loadNotificationPreference();
+    loadSettingsPreferences();
   }, []);
-
   const loadNotificationPreference = async () => {
     const enabled = await notificationService.areNotificationsEnabled();
     setNotifications(enabled);
   };
 
+  const loadSettingsPreferences = async () => {
+    try {
+      const saved = await AsyncStorage.getItem('settingsPreferences');
+      if (saved) {
+        const prefs = JSON.parse(saved);
+        if (typeof prefs.showOnline === 'boolean') setShowOnline(prefs.showOnline);
+      }
+    } catch (e) {
+      console.warn('Failed to load settings preferences:', e);
+    }
+  };
+
   const handleNotificationToggle = async (value) => {
     setNotifications(value);
     await notificationService.setNotificationsEnabled(value);
+  };
+
+  const handleShowOnlineToggle = async (value) => {
+    setShowOnline(value);
+    try {
+      const saved = await AsyncStorage.getItem('settingsPreferences');
+      const prefs = saved ? JSON.parse(saved) : {};
+      prefs.showOnline = value;
+      await AsyncStorage.setItem('settingsPreferences', JSON.stringify(prefs));
+    } catch (e) {
+      console.warn('Failed to save show online preference:', e);
+    }
   };
 
   const handleLogout = () => {
@@ -1644,10 +1768,13 @@ const SettingsScreen = ({ navigation }) => {
           text: 'Logout',
           style: 'destructive',
           onPress: async () => {
-            await supabase.auth.signOut();
-            await AsyncStorage.clear();
-            // Navigate to auth
-            console.log('Logged out');
+            try {
+              await AsyncStorage.clear();
+              await supabase.auth.signOut();
+            } catch (error) {
+              console.error('Logout error:', error);
+              Alert.alert('Error', 'Logout failed. Please try again.');
+            }
           }
         }
       ]
@@ -1675,13 +1802,43 @@ const SettingsScreen = ({ navigation }) => {
     }
   };
 
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     setShowDeleteModal(false);
-    Alert.alert(
-      'Account Deletion',
-      'Your account has been scheduled for deletion. You will receive a confirmation email.',
-      [{ text: 'OK' }]
-    );
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      // Log the deletion request
+      await supabase.from('user_feedback').insert({
+        user_id: user.id,
+        category: 'general',
+        subject: 'Account Deletion Request',
+        message: 'User requested account deletion from settings.',
+        status: 'open',
+      });
+
+      // Actually delete the auth user and cascade to all tables
+      const { error } = await supabase.rpc('delete_user_and_related_data', { user_id: user.id });
+      if (error) {
+        // Fallback: try admin API or just sign out
+        console.warn('RPC delete failed, trying direct approach:', error.message);
+        // Clear local data and sign out
+        await AsyncStorage.clear();
+        await supabase.auth.signOut();
+        Alert.alert('Account Deletion', 'Your local data has been cleared. For full deletion, please contact support.');
+        return;
+      }
+
+      await AsyncStorage.clear();
+      await supabase.auth.signOut();
+      Alert.alert('Account Deleted', 'Your account and all associated data have been permanently deleted.');
+    } catch (error) {
+      console.error('Delete account error:', error);
+      // Fallback: clear local data and sign out
+      await AsyncStorage.clear();
+      await supabase.auth.signOut();
+      Alert.alert('Account Deletion', 'Your local data has been cleared. For full deletion, please contact support.');
+    }
   };
 
   const submitFeedback = async () => {
@@ -1795,7 +1952,7 @@ const SettingsScreen = ({ navigation }) => {
         <View style={styles.settingsSection}>
           <Text style={styles.settingsHeader}>ACCOUNT</Text>
           
-          <TouchableOpacity style={styles.settingsItem}>
+          <TouchableOpacity style={styles.settingsItem} onPress={() => Alert.alert('Account Info', 'View and edit your account email, phone, and login details. Coming soon.')}>
             <View style={styles.settingsItemLeft}>
               <Ionicons name="person" size={20} color={colors.textSecondary} />
               <Text style={styles.settingsItemText}>Account Information</Text>
@@ -1803,7 +1960,7 @@ const SettingsScreen = ({ navigation }) => {
             <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.settingsItem}>
+          <TouchableOpacity style={styles.settingsItem} onPress={() => Alert.alert('Privacy & Security', 'Manage who can see your profile, block list, and security settings. Coming soon.')}>
             <View style={styles.settingsItemLeft}>
               <Ionicons name="shield" size={20} color={colors.textSecondary} />
               <Text style={styles.settingsItemText}>Privacy & Security</Text>
@@ -1811,16 +1968,26 @@ const SettingsScreen = ({ navigation }) => {
             <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.settingsItem}>
+          <TouchableOpacity style={styles.settingsItem} onPress={() => navigation.navigate('Premium')}>
             <View style={styles.settingsItemLeft}>
               <Ionicons name="card" size={20} color={colors.textSecondary} />
               <Text style={styles.settingsItemText}>Subscription</Text>
             </View>
             <View style={styles.settingsItemRight}>
-              <Text style={styles.settingsItemValue}>Free</Text>
+              <Text style={styles.settingsItemValue}>Preview</Text>
               <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
             </View>
           </TouchableOpacity>
+
+          {effectiveMode === 'matrimony' && preferredMode === 'community' && (
+            <TouchableOpacity style={styles.settingsItem} onPress={() => navigation.navigate('FamilyAccount')}>
+              <View style={styles.settingsItemLeft}>
+                <Ionicons name="people" size={20} color={colors.textSecondary} />
+                <Text style={styles.settingsItemText}>Family Account</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
+            </TouchableOpacity>
+          )}
 
           <TouchableOpacity style={styles.settingsItem} onPress={handleResetPassword}>
             <View style={styles.settingsItemLeft}>
@@ -1856,7 +2023,7 @@ const SettingsScreen = ({ navigation }) => {
             </View>
             <Switch
               value={showOnline}
-              onValueChange={setShowOnline}
+              onValueChange={handleShowOnlineToggle}
               trackColor={{ false: colors.border, true: colors.primary }}
               thumbColor={colors.text}
               style={styles.switch}
@@ -1901,7 +2068,7 @@ const SettingsScreen = ({ navigation }) => {
         <View style={styles.settingsSection}>
           <Text style={styles.settingsHeader}>SUPPORT</Text>
           
-          <TouchableOpacity style={styles.settingsItem}>
+          <TouchableOpacity style={styles.settingsItem} onPress={() => navigation.navigate('SupportCenter')}>
             <View style={styles.settingsItemLeft}>
               <Ionicons name="help-circle" size={20} color={colors.textSecondary} />
               <Text style={styles.settingsItemText}>Help Center</Text>
@@ -1909,7 +2076,7 @@ const SettingsScreen = ({ navigation }) => {
             <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.settingsItem}>
+          <TouchableOpacity style={styles.settingsItem} onPress={() => navigation.navigate('SupportCenter')}>
             <View style={styles.settingsItemLeft}>
               <Ionicons name="chatbubble" size={20} color={colors.textSecondary} />
               <Text style={styles.settingsItemText}>Contact Support</Text>
@@ -1981,7 +2148,10 @@ const SettingsScreen = ({ navigation }) => {
             </TouchableOpacity>
           </View>
 
-          <TouchableOpacity style={styles.settingsItem}>
+          <TouchableOpacity
+            style={styles.settingsItem}
+            onPress={() => navigation.navigate('LegalDocument', { documentKey: 'terms' })}
+          >
             <View style={styles.settingsItemLeft}>
               <Ionicons name="document-text" size={20} color={colors.textSecondary} />
               <Text style={styles.settingsItemText}>Terms of Service</Text>
@@ -1989,10 +2159,24 @@ const SettingsScreen = ({ navigation }) => {
             <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.settingsItem}>
+          <TouchableOpacity
+            style={styles.settingsItem}
+            onPress={() => navigation.navigate('LegalDocument', { documentKey: 'privacy' })}
+          >
             <View style={styles.settingsItemLeft}>
               <Ionicons name="lock-closed" size={20} color={colors.textSecondary} />
               <Text style={styles.settingsItemText}>Privacy Policy</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.settingsItem}
+            onPress={() => navigation.navigate('LegalDocument', { documentKey: 'refunds' })}
+          >
+            <View style={styles.settingsItemLeft}>
+              <Ionicons name="refresh-circle" size={20} color={colors.textSecondary} />
+              <Text style={styles.settingsItemText}>Refund Policy</Text>
             </View>
             <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
           </TouchableOpacity>
@@ -2058,6 +2242,225 @@ const SettingsScreen = ({ navigation }) => {
   );
 };
 
+const AccountInfoScreen = ({ navigation }) => {
+  const [loading, setLoading] = useState(true);
+  const [fullName, setFullName] = useState('');
+  const [email, setEmail] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    loadAccountInfo();
+  }, []);
+
+  const loadAccountInfo = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        Alert.alert('Not signed in', 'Please sign in to view account information.');
+        navigation.goBack();
+        return;
+      }
+
+      setEmail(user.email || '');
+      const { data, error } = await supabase.from('users').select('full_name').eq('id', user.id).single();
+      if (error) throw error;
+      setFullName(data?.full_name || '');
+    } catch (error) {
+      console.error('AccountInfo load error:', error);
+      Alert.alert('Error', 'Unable to load account information.');
+      navigation.goBack();
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const saveAccountInfo = async () => {
+    setSaving(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
+      const { error } = await supabase.from('users').update({ full_name: fullName.trim() || null }).eq('id', user.id);
+      if (error) throw error;
+      Alert.alert('Saved', 'Your account information has been updated.');
+    } catch (error) {
+      console.error('AccountInfo save error:', error);
+      Alert.alert('Error', error.message || 'Unable to update account information.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={colors.primary} />
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.container}>
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => navigation.goBack()}>
+          <Ionicons name="arrow-back" size={24} color={colors.text} />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Account Information</Text>
+        <View style={{ width: 40 }} />
+      </View>
+      <ScrollView contentContainerStyle={styles.editForm}>
+        <Text style={styles.inputLabel}>Email</Text>
+        <Text style={[styles.profileLocation, { marginBottom: 16 }]}>{email || 'No email available'}</Text>
+
+        <Text style={styles.inputLabel}>Full Name</Text>
+        <TextInput
+          style={styles.input}
+          value={fullName}
+          onChangeText={setFullName}
+          placeholder="Your full name"
+          placeholderTextColor={colors.textSecondary}
+        />
+
+        <Text style={[styles.inputLabel, { marginTop: 24 }]}>Email management</Text>
+        <Text style={styles.bioText}>
+          Email changes are managed through your login provider. To update your email, use password reset or contact support.
+        </Text>
+
+        <TouchableOpacity
+          style={[styles.saveButton, { opacity: saving ? 0.7 : 1 }]}
+          onPress={saveAccountInfo}
+          disabled={saving}
+        >
+          {saving ? (
+            <ActivityIndicator size="small" color={colors.text} />
+          ) : (
+            <Text style={styles.saveButtonText}>Save Changes</Text>
+          )}
+        </TouchableOpacity>
+      </ScrollView>
+    </View>
+  );
+};
+
+const PrivacySecurityScreen = ({ navigation }) => {
+  const [hideProfile, setHideProfile] = useState(false);
+  const [autoBlockSuspicious, setAutoBlockSuspicious] = useState(false);
+  const [showOnlineStatus, setShowOnlineStatus] = useState(true);
+  const [loadingPrefs, setLoadingPrefs] = useState(true);
+
+  useEffect(() => {
+    loadPrivacyPreferences();
+  }, []);
+
+  const loadPrivacyPreferences = async () => {
+    try {
+      const saved = await AsyncStorage.getItem('privacyPreferences');
+      if (saved) {
+        const prefs = JSON.parse(saved);
+        setHideProfile(!!prefs.hideProfile);
+        setAutoBlockSuspicious(!!prefs.autoBlockSuspicious);
+        setShowOnlineStatus(prefs.showOnlineStatus !== false);
+      }
+    } catch (error) {
+      console.warn('Failed to load privacy preferences:', error);
+    } finally {
+      setLoadingPrefs(false);
+    }
+  };
+
+  const savePrivacyPreferences = async (prefs) => {
+    try {
+      await AsyncStorage.setItem('privacyPreferences', JSON.stringify(prefs));
+    } catch (error) {
+      console.warn('Failed to save privacy preferences:', error);
+    }
+  };
+
+  const toggleHideProfile = async (value) => {
+    setHideProfile(value);
+    await savePrivacyPreferences({ hideProfile: value, autoBlockSuspicious, showOnlineStatus });
+  };
+
+  const toggleAutoBlockSuspicious = async (value) => {
+    setAutoBlockSuspicious(value);
+    await savePrivacyPreferences({ hideProfile, autoBlockSuspicious: value, showOnlineStatus });
+  };
+
+  const toggleShowOnlineStatus = async (value) => {
+    setShowOnlineStatus(value);
+    await savePrivacyPreferences({ hideProfile, autoBlockSuspicious, showOnlineStatus: value });
+  };
+
+  if (loadingPrefs) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={colors.primary} />
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.container}>
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => navigation.goBack()}>
+          <Ionicons name="arrow-back" size={24} color={colors.text} />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Privacy & Security</Text>
+        <View style={{ width: 40 }} />
+      </View>
+      <ScrollView>
+        <View style={styles.settingsSection}>
+          <View style={styles.settingsItem}>
+            <View style={styles.settingsItemLeft}>
+              <Ionicons name="eye-off" size={20} color={colors.textSecondary} />
+              <Text style={styles.settingsItemText}>Hide profile from search</Text>
+            </View>
+            <Switch
+              value={hideProfile}
+              onValueChange={toggleHideProfile}
+              trackColor={{ false: colors.border, true: colors.primary }}
+              thumbColor={colors.text}
+            />
+          </View>
+
+          <View style={styles.settingsItem}>
+            <View style={styles.settingsItemLeft}>
+              <Ionicons name="shield-checkmark" size={20} color={colors.textSecondary} />
+              <Text style={styles.settingsItemText}>Auto block suspicious contacts</Text>
+            </View>
+            <Switch
+              value={autoBlockSuspicious}
+              onValueChange={toggleAutoBlockSuspicious}
+              trackColor={{ false: colors.border, true: colors.primary }}
+              thumbColor={colors.text}
+            />
+          </View>
+
+          <View style={styles.settingsItem}>
+            <View style={styles.settingsItemLeft}>
+              <Ionicons name="person" size={20} color={colors.textSecondary} />
+              <Text style={styles.settingsItemText}>Show online status</Text>
+            </View>
+            <Switch
+              value={showOnlineStatus}
+              onValueChange={toggleShowOnlineStatus}
+              trackColor={{ false: colors.border, true: colors.primary }}
+              thumbColor={colors.text}
+            />
+          </View>
+
+          <View style={[styles.settingsItem, { alignItems: 'flex-start', flexDirection: 'column' }]}> 
+            <Text style={[styles.settingsItemText, { marginLeft: 0, marginBottom: 10 }]}>Blocked members</Text>
+            <Text style={styles.bioText}>
+              Manage your block list through the chat safety menu or contact support if you need help removing a block.
+            </Text>
+          </View>
+        </View>
+      </ScrollView>
+    </View>
+  );
+};
+
 // Profile Stack Navigator
 const ProfileStack = () => {
   return (
@@ -2065,14 +2468,21 @@ const ProfileStack = () => {
       initialRouteName="Profile"
       screenOptions={{
         headerShown: false,
-        cardStyle: { backgroundColor: colors.background },
+        cardStyle: { backgroundColor: datingColors.background },
       }}
     >
       <Stack.Screen name="Profile" component={ProfileScreen} />
       <Stack.Screen name="EditProfile" component={EditProfileScreen} />
       <Stack.Screen name="Settings" component={SettingsScreen} />
+      <Stack.Screen name="AccountInfo" component={AccountInfoScreen} />
+      <Stack.Screen name="PrivacySecurity" component={PrivacySecurityScreen} />
       <Stack.Screen name="Premium" component={PremiumScreen} />
       <Stack.Screen name="FishTrap" component={FishTrapProfileScreen} />
+      <Stack.Screen name="Verification" component={VideoVerificationScreen} />
+      <Stack.Screen name="FamilyAccount" component={FamilyAccountScreen} />
+      <Stack.Screen name="LegalDocument" component={LegalDocumentScreen} />
+      <Stack.Screen name="SupportCenter" component={SupportCenterScreen} />
+      <Stack.Screen name="Notifications" component={NotificationsScreen} />
     </Stack.Navigator>
   );
 };

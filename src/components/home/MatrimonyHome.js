@@ -38,6 +38,7 @@ const MatrimonyHome = ({ navigation }) => {
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [sentInterests, setSentInterests] = useState({});
   const [filters, setFilters] = useState({ religion: 'All', education: 'All', ageRange: [18, 50] });
+  const [preferenceMode, setPreferenceMode] = useState('zone');
   const [isInQuarantine, setIsInQuarantine] = useState(false);
   const [showVerificationPopup, setShowVerificationPopup] = useState(false);
 
@@ -49,16 +50,21 @@ const MatrimonyHome = ({ navigation }) => {
 
   const loadFiltersAndProfiles = async () => {
     try {
-      const saved = await AsyncStorage.getItem('filters_matrimony');
-      const currentFilters = saved ? JSON.parse(saved) : filters;
+      const [savedFilters, savedMode] = await Promise.all([
+        AsyncStorage.getItem('filters_matrimony'),
+        AsyncStorage.getItem('matrimony_preference_mode'),
+      ]);
+      const currentFilters = savedFilters ? JSON.parse(savedFilters) : filters;
+      const currentMode = savedMode || 'zone';
       setFilters(currentFilters);
-      loadProfiles(currentFilters);
+      setPreferenceMode(currentMode);
+      loadProfiles(currentFilters, currentMode);
     } catch (e) {
-      loadProfiles(filters);
+      loadProfiles(filters, preferenceMode);
     }
   };
 
-  const loadProfiles = async (currentFilters) => {
+  const loadProfiles = async (currentFilters, mode = preferenceMode) => {
     setLoading(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -71,28 +77,30 @@ const MatrimonyHome = ({ navigation }) => {
       // Get profiles via Fish Trap service
       const fishTrapProfiles = await fishTrapService.getProfilesForUser(user.id, {
         limit: 50,
-        offset: 0
+        offset: 0,
+        mode: 'matrimony'
       });
 
       if (fishTrapProfiles && fishTrapProfiles.length > 0) {
         // Map to expected format
         const mapped = fishTrapProfiles.map(profile => {
           const u = profile.users || {};
-          const p = profile.user_profiles?.[0] || {};
-          
+
           return {
-            id: profile.id, // This will be the decoy_id if is_decoy is true
+            id: profile.user_id || profile.id, // real profiles use user_id, decoys use decoy id
+            decoy_id: profile.decoy_id,
+            user_id: profile.user_id || profile.id,
             display_name: u.full_name || u.name,
             age: u.age || (u.date_of_birth ? Math.floor((Date.now() - new Date(u.date_of_birth).getTime()) / (365.25 * 24 * 3600 * 1000)) : null),
             city: u.city,
             trust_level: u.trust_score >= 80 ? 'green_verified' : 'unverified',
             primary_photo_url: profile.primary_photo_url,
-            religion: p.religion || '',
-            education: p.education || '',
-            interests: p.interests || [],
-            bio: p.bio || '',
-            occupation: p.occupation || '',
-            annual_income: p.annual_income || '',
+            religion: profile.religion || '',
+            education: profile.education || '',
+            interests: profile.interests || [],
+            bio: profile.about || profile.bio || '',
+            occupation: profile.occupation || '',
+            annual_income: profile.annual_income || '',
             is_decoy: profile.is_decoy || false,
             can_send_request: profile.can_send_request !== false
           };
@@ -105,6 +113,10 @@ const MatrimonyHome = ({ navigation }) => {
           const ageMatch = !p.age || (p.age >= currentFilters.ageRange[0] && p.age <= currentFilters.ageRange[1]);
           return religionMatch && educationMatch && ageMatch;
         });
+      if (mode === 'community') {
+        // Community mode may use a different ordering or feature set in future.
+        filtered.sort((a, b) => (a.trust_level === 'green_verified' && b.trust_level !== 'green_verified' ? -1 : 1));
+      }
 
         setAllProfiles(filtered);
         setRecentProfiles(filtered.slice(0, 4));
@@ -117,6 +129,23 @@ const MatrimonyHome = ({ navigation }) => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handlePreferenceModeChange = async (mode) => {
+    if (!['zone', 'community'].includes(mode)) return;
+    setPreferenceMode(mode);
+    await AsyncStorage.setItem('matrimony_preference_mode', mode);
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        await supabase.from('users').update({ preferred_mode: mode }).eq('id', user.id);
+      }
+    } catch (err) {
+      // ignore if this field/table is unavailable
+    }
+
+    loadProfiles(filters, mode);
   };
 
   const handleSendInterest = async (profile) => {
@@ -134,7 +163,8 @@ const MatrimonyHome = ({ navigation }) => {
 
       // If decoy, start decoy chat
       if (profile.is_decoy) {
-        const result = await fishTrapService.startDecoyChat(user.id, profile.id);
+        const decoyId = profile.decoy_id || profile.id;
+        const result = await fishTrapService.startDecoyChat(user.id, decoyId);
         if (result.success) {
           setSentInterests(prev => ({ ...prev, [profile.id]: true }));
           setShowDetailModal(false);
@@ -146,7 +176,7 @@ const MatrimonyHome = ({ navigation }) => {
       }
 
       // If real profile and verified
-      await sendInterest(profile.id);
+      await sendInterest(profile.user_id || profile.id);
 
     } catch (error) {
       console.error('Interest error:', error);
@@ -184,7 +214,7 @@ const MatrimonyHome = ({ navigation }) => {
       <TouchableOpacity onPress={() => { setSelectedProfile(item); setShowDetailModal(true); }}>
         <Image source={{ uri: item.primary_photo_url || 'https://via.placeholder.com/140' }} style={styles.hCardPhoto} />
         {item.trust_level === 'green_verified' && (
-          <View style={styles.hCardBadge}><Ionicons name="checkmark-seal" size={12} color={themeColor} /></View>
+          <View style={styles.hCardBadge}><Ionicons name="checkmark-circle" size={12} color={themeColor} /></View>
         )}
         <View style={styles.hCardInfo}>
           <Text style={styles.hCardName} numberOfLines={1}>{item.display_name}</Text>
@@ -250,6 +280,21 @@ const MatrimonyHome = ({ navigation }) => {
           </View>
           <TouchableOpacity style={styles.headerBtn} onPress={() => navigation.navigate('Filters')}>
             <Ionicons name="options" size={24} color={Colors.text} />
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.modeSwitcher}>
+          <TouchableOpacity
+            style={[styles.modeButton, preferenceMode === 'zone' ? styles.modeButtonActive : null]}
+            onPress={() => handlePreferenceModeChange('zone')}
+          >
+            <Text style={[styles.modeButtonText, preferenceMode === 'zone' ? styles.modeButtonTextActive : null]}>Zone</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.modeButton, preferenceMode === 'community' ? styles.modeButtonActive : null]}
+            onPress={() => handlePreferenceModeChange('community')}
+          >
+            <Text style={[styles.modeButtonText, preferenceMode === 'community' ? styles.modeButtonTextActive : null]}>Community</Text>
           </TouchableOpacity>
         </View>
 
@@ -320,6 +365,11 @@ const MatrimonyHome = ({ navigation }) => {
 const styles = StyleSheet.create({
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingTop: 52, paddingBottom: 16 },
   headerTitle: { fontSize: 26, fontWeight: 'bold', color: Colors.text },
+  modeSwitcher: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', paddingHorizontal: 16, marginBottom: 16 },
+  modeButton: { flex: 1, paddingVertical: 10, borderRadius: 14, backgroundColor: Colors.surface, marginHorizontal: 6, borderWidth: 1, borderColor: Colors.border, alignItems: 'center' },
+  modeButtonActive: { backgroundColor: '#FACC15', borderColor: '#F59E0B' },
+  modeButtonText: { fontSize: 14, fontWeight: '700', color: Colors.textSecondary },
+  modeButtonTextActive: { color: Colors.text },
   headerSub: { fontSize: 12, color: Colors.textSecondary, marginTop: 2 },
   headerBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: Colors.surface, justifyContent: 'center', alignItems: 'center' },
   filterSummary: { marginHorizontal: 20, marginBottom: 16, backgroundColor: Colors.surface, padding: 8, borderRadius: 12, alignItems: 'center' },
@@ -339,10 +389,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     overflow: 'hidden',
     elevation: 4,
-    shadowColor: Colors.primary,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
+    boxShadow: '0px 4px 8px rgba(217,119,6,0.2)',
   },
   suyamvaramGradient: {
     flexDirection: 'row',

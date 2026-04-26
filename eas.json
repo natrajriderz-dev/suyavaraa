@@ -7,18 +7,21 @@
     "development": {
       "developmentClient": true,
       "distribution": "internal",
+      "channel": "development",
       "ios": {
         "simulator": true
       }
     },
     "preview": {
       "distribution": "internal",
+      "channel": "preview",
       "env": {
         "EXPO_PUBLIC_SUPABASE_URL": "https://tlssfmtiwzdbvxchrfzq.supabase.co",
         "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRsc3NmbXRpd3pkYnZ4Y2hyZnpxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY1OTI2NjUsImV4cCI6MjA5MjE2ODY2NX0.5Q7ObjrVryop3ON3inB7yaGSR6iqtCPfZvOpjZVX-Ck"
       }
     },
     "production": {
+      "channel": "production",
       "env": {
         "EXPO_PUBLIC_SUPABASE_URL": "https://tlssfmtiwzdbvxchrfzq.supabase.co",
         "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRsc3NmbXRpd3pkYnZ4Y2hyZnpxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY1OTI2NjUsImV4cCI6MjA5MjE2ODY2NX0.5Q7ObjrVryop3ON3inB7yaGSR6iqtCPfZvOpjZVX-Ck"

@@ -74,7 +74,11 @@ const SwipeableCard = ({ profile, onSwipe }) => {
 
   return (
     <Animated.View style={[styles.card, cardStyle]} {...panResponder.panHandlers}>
-      <Image source={{ uri: profile.profile_picture_url || 'https://via.placeholder.com/400' }} style={styles.cardImage} />
+      <Image 
+        source={{ uri: profile.profile_picture_url || 'https://via.placeholder.com/400' }} 
+        style={styles.cardImage} 
+        resizeMode="cover"
+      />
 
       <LinearGradient
         colors={['transparent', 'rgba(0,0,0,0.8)']}
@@ -90,7 +94,7 @@ const SwipeableCard = ({ profile, onSwipe }) => {
       <View style={styles.cardHeader}>
         {profile.is_verified && (
           <View style={styles.verifiedBadge}>
-            <Ionicons name="checkmark-seal" size={20} color={Colors.primary} />
+            <Ionicons name="checkmark-circle" size={20} color={Colors.primary} />
           </View>
         )}
         {profile.trust_score >= 80 && (
@@ -125,20 +129,13 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     backgroundColor: Colors.surface,
     position: 'absolute',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
+    boxShadow: '0px 2px 3.84px rgba(0,0,0,0.25)',
     elevation: 5,
     overflow: 'hidden',
   },
   cardImage: {
     width: '100%',
     height: '70%',
-    resizeMode: 'cover',
   },
   cardGradient: {
     position: 'absolute',
@@ -181,10 +178,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     elevation: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
+    boxShadow: '0px 2px 4px rgba(0,0,0,0.2)',
   },
   trustBadge: {
     backgroundColor: 'rgba(16, 185, 129, 0.9)',
