@@ -207,15 +207,15 @@ const BasicInfoScreen = ({ navigation, route }) => {
       navigation.replace('VideoVerification');
     } catch (err) {
       console.error('Save Profile Error:', err);
-      const { supabaseConfig } = require('../../../supabase');
       let errorMessage = err.message || 'Failed to save profile';
       
       if (errorMessage.includes('Network request failed')) {
-        errorMessage = `Network Error: Cannot reach ${supabaseConfig.projectHost}. Please check your internet.`;
+        errorMessage = 'Network error. Please check your internet connection and try again.';
       }
       
       Alert.alert('Error', errorMessage);
     } finally {
+      // Ensure loading is ALWAYS disabled
       setLoading(false);
     }
   };
@@ -264,7 +264,12 @@ const BasicInfoScreen = ({ navigation, route }) => {
           style: {
             height: '50px',
             backgroundColor: Colors.surface,
-            borderRadius: '12px',
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 4 },
+            shadowOpacity: 0.1,
+            shadowRadius: 12,
+            elevation: 5,
+            marginBottom: 20,
             padding: '0 16px',
             fontSize: '16px',
             color: Colors.text,

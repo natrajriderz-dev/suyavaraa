@@ -149,7 +149,7 @@ test.describe('Admin Dashboard Error Check', () => {
     });
 
     // Navigate to admin page
-    await page.goto('http://localhost:8081/admin.html');
+    await page.goto('/admin.html');
     
     // Wait for React to render (increased timeout for slow CI)
     await page.waitForTimeout(3000);

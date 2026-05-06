@@ -8,35 +8,69 @@ const {
   ScrollView,
   Dimensions,
   Platform,
+  Share,
+  ActivityIndicator,
 } = require('react-native');
 const { Ionicons } = require('@expo/vector-icons');
 const { LinearGradient } = require('expo-linear-gradient');
 const Colors = require('../../theme/Colors');
 const paymentService = require('../../services/paymentService');
 const { Alert } = require('react-native');
+const { supabase } = require('../../supabase');
 
 const { width } = Dimensions.get('window');
 
 const PremiumScreen = ({ navigation }) => {
-  const purchaseUnavailableMessage =
-    Platform.OS === 'android'
-      ? 'Premium purchases are temporarily unavailable on Android while Google Play Billing and review requirements are being finalized.'
-      : 'Premium purchases are temporarily unavailable while payment compliance review is being completed.';
+  const [referralCode, setReferralCode] = React.useState('');
+  const [loadingCode, setLoadingCode] = React.useState(true);
+
+  React.useEffect(() => {
+    fetchReferralCode();
+  }, []);
+
+  const fetchReferralCode = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      
+      const { data, error } = await supabase
+        .from('users')
+        .select('referral_code')
+        .eq('id', user.id)
+        .single();
+        
+      if (!error && data?.referral_code) {
+        setReferralCode(data.referral_code);
+      }
+    } catch (e) {
+      console.warn(e);
+    } finally {
+      setLoadingCode(false);
+    }
+  };
+
+  const handleShare = async () => {
+    if (!referralCode) return;
+    try {
+      await Share.share({
+        message: `Join Suyavaraa with my referral code ${referralCode} to get 3 days of FREE Premium!`,
+      });
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
   const plans = [
     {
       id: 'monthly',
-      title: 'Monthly',
-      price: '₹299',
-      period: '/month',
+      title: 'Premium Standard',
       features: ['Unlimited Likes', 'Full IMPRESS Feed', 'Who Viewed You', 'AI Relationship Coach'],
       color: ['#E91E63', '#9C27B0'], // Dating vibe
     },
     {
       id: 'yearly',
-      title: 'Yearly',
-      price: '₹2499',
-      period: '/year',
-      features: ['Everything in Monthly', 'Matrimony Suyamvaram Creator', 'AI Matrimony Guide', 'Saves 30%'],
+      title: 'Premium Plus',
+      features: ['Everything in Standard', 'Matrimony Suyamvaram Creator', 'AI Matrimony Guide', 'Priority Profile Visibility'],
       color: ['#D97706', '#F59E0B'], // Matrimony vibe
       recommended: true,
     }
@@ -51,10 +85,6 @@ const PremiumScreen = ({ navigation }) => {
       )}
       <LinearGradient colors={plan.color} style={styles.planHeader}>
         <Text style={styles.planTitle}>{plan.title}</Text>
-        <View style={styles.priceRow}>
-          <Text style={styles.planPrice}>{plan.price}</Text>
-          <Text style={styles.planPeriod}>{plan.period}</Text>
-        </View>
       </LinearGradient>
       
       <View style={styles.planBody}>
@@ -64,16 +94,6 @@ const PremiumScreen = ({ navigation }) => {
             <Text style={styles.featureText}>{feature}</Text>
           </View>
         ))}
-        
-        <TouchableOpacity 
-          style={[styles.selectBtn, styles.selectBtnDisabled, { backgroundColor: plan.color[0] }]}
-          onPress={async () => {
-            const result = await paymentService.createCheckoutSession(plan.id);
-            Alert.alert('Premium Preview', result.error || purchaseUnavailableMessage);
-          }}
-        >
-          <Text style={styles.selectBtnText}>Coming Soon</Text>
-        </TouchableOpacity>
       </View>
     </View>
   );
@@ -89,16 +109,26 @@ const PremiumScreen = ({ navigation }) => {
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <View style={styles.heroSection}>
-          <Text style={styles.heroTitle}>Premium Preview</Text>
-          <Text style={styles.heroSub}>We are polishing premium access, billing, and policy flows before enabling purchases.</Text>
+          <Text style={styles.heroTitle}>Refer & Earn Premium</Text>
+          <Text style={styles.heroSub}>Invite friends to unlock Premium! Earn 7 days for every friend who joins, and they get 3 days free.</Text>
+
+          <View style={styles.referralContainer}>
+            <Text style={styles.referralLabel}>Your Invite Code</Text>
+            {loadingCode ? (
+              <ActivityIndicator color={Colors.primary} />
+            ) : (
+              <View style={styles.codeRow}>
+                <Text style={styles.codeText}>{referralCode || 'UNAVAILABLE'}</Text>
+                <TouchableOpacity style={styles.shareBtn} onPress={handleShare}>
+                  <Ionicons name="share-social" size={20} color="#fff" />
+                  <Text style={styles.shareBtnText}>Share</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
         </View>
 
         {plans.map(plan => <PlanCard key={plan.id} plan={plan} />)}
-
-        <View style={styles.footer}>
-          <Text style={styles.footerText}>Billing Temporarily Disabled</Text>
-          <Text style={styles.footerSub}>{purchaseUnavailableMessage}</Text>
-        </View>
       </ScrollView>
     </View>
   );
@@ -119,6 +149,12 @@ const styles = StyleSheet.create({
   heroSection: { alignItems: 'center', marginBottom: 30 },
   heroTitle: { fontSize: 28, fontWeight: 'bold', color: '#1C1C1E', textAlign: 'center' },
   heroSub: { fontSize: 16, color: '#6B7280', textAlign: 'center', marginTop: 10, lineHeight: 22 },
+  referralContainer: { marginTop: 24, padding: 20, backgroundColor: '#FFF5F5', borderRadius: 16, width: '100%', borderWidth: 1, borderColor: '#FFE4E6' },
+  referralLabel: { fontSize: 14, color: '#E91E63', fontWeight: 'bold', marginBottom: 8, textTransform: 'uppercase' },
+  codeRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  codeText: { fontSize: 24, fontWeight: 'bold', color: '#1C1C1E', letterSpacing: 2 },
+  shareBtn: { flexDirection: 'row', backgroundColor: '#E91E63', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 12, alignItems: 'center' },
+  shareBtnText: { color: '#fff', fontWeight: 'bold', marginLeft: 6 },
   planCard: {
     backgroundColor: '#fff',
     borderRadius: 24,

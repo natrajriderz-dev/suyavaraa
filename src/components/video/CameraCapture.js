@@ -156,11 +156,14 @@ const CameraCapture = ({ onCapture, type = 'front', instruction = 'Align your fa
 
     (async () => {
       const requestCameraPermission =
-        ExpoCamera.requestCameraPermissionsAsync ||
-        Camera.requestCameraPermissionsAsync;
+        ExpoCamera?.requestCameraPermissionsAsync;
       const requestMicrophonePermission =
-        ExpoCamera.requestMicrophonePermissionsAsync ||
-        Camera.requestMicrophonePermissionsAsync;
+        ExpoCamera?.requestMicrophonePermissionsAsync;
+
+      if (!requestCameraPermission || !requestMicrophonePermission) {
+        setHasPermission(false);
+        return;
+      }
 
       const { status } = await requestCameraPermission();
       const { status: micStatus } = await requestMicrophonePermission();

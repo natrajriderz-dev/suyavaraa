@@ -20,6 +20,13 @@ const fishTrapService = require('../../services/fishTrapService');
 const { Ionicons } = require('@expo/vector-icons');
 
 const { useMode } = require('../../../context/ModeContext');
+
+const navigateToVerification = (navigation) => {
+  navigation.navigate('Profile', {
+    screen: 'Verification',
+  });
+};
+
 const DatingHome = ({ navigation }) => {
   const { userMode } = useMode();
   const themeColor = '#E91E63'; // Vibrant Pink for Dating
@@ -292,8 +299,7 @@ const DatingHome = ({ navigation }) => {
                 style={[styles.verificationBtn, styles.verifyBtn, { backgroundColor: themeColor }]}
                 onPress={() => {
                   setShowVerificationPopup(false);
-                  // Navigate to verification screen
-                  navigation.navigate('VideoVerification'); // Navigate to verification screen
+                  navigateToVerification(navigation);
                 }}
               >
                 <Text style={styles.verifyBtnText}>Get Verified</Text>

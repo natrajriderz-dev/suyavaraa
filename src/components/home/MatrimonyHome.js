@@ -26,6 +26,13 @@ const { Ionicons } = require('@expo/vector-icons');
 const notificationService = require('../../services/notificationService');
 
 const { useMode } = require('../../../context/ModeContext');
+
+const navigateToVerification = (navigation) => {
+  navigation.navigate('Profile', {
+    screen: 'Verification',
+  });
+};
+
 const MatrimonyHome = ({ navigation }) => {
   const { userMode } = useMode();
   const themeColor = '#D4A017'; // Gold for Matrimony
@@ -252,7 +259,10 @@ const MatrimonyHome = ({ navigation }) => {
             </Text>
             <TouchableOpacity 
               style={[styles.vBtn, { backgroundColor: themeColor }]}
-              onPress={() => { setShowVerificationPopup(false); navigation.navigate('VideoVerification'); }}
+              onPress={() => {
+                setShowVerificationPopup(false);
+                navigateToVerification(navigation);
+              }}
             >
               <Text style={styles.vBtnText}>Verify Now</Text>
             </TouchableOpacity>

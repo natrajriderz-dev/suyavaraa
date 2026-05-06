@@ -16,8 +16,11 @@ const AuthStyles = StyleSheet.create({
     borderRadius: 24,
     padding: 24,
     width: '100%',
-    boxShadow: '0px 8px 16px rgba(0,0,0,0.1)',
-    elevation: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 5,
     marginBottom: 20,
   },
   scrollContainer: {

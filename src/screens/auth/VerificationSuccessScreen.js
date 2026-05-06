@@ -71,7 +71,10 @@ const styles = StyleSheet.create({
     borderRadius: 18, 
     alignItems: 'center',
     elevation: 4,
-    boxShadow: '0px 4px 8px rgba(217,119,6,0.2)',
+    shadowColor: Colors.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
   },
   primaryBtnText: { color: '#fff', fontSize: 18, fontWeight: 'bold' },
 });

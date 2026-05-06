@@ -28,7 +28,7 @@ const ImpressScreen = ({ navigation }) => {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [page, setPage] = useState(0);
   const [hasMore, setHasMore] = useState(true);
-  const { userMode } = useMode();
+  const { userMode, switchMode } = useMode();
 
   useEffect(() => {
     if (userMode === 'dating') {
@@ -189,7 +189,7 @@ const ImpressScreen = ({ navigation }) => {
       <View style={styles.emptyContainer}>
         <Text style={styles.emptyText}>Impress Feed</Text>
         <Text style={styles.emptySubtext}>Available only in Dating mode.</Text>
-        <TouchableOpacity style={styles.switchButton} onPress={() => navigation.navigate('ModeSelect')}>
+        <TouchableOpacity style={styles.switchButton} onPress={() => switchMode('dating')}>
           <Text style={styles.buttonText}>Switch Mode</Text>
         </TouchableOpacity>
       </View>

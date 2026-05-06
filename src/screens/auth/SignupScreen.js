@@ -26,6 +26,23 @@ const SignupScreen = ({ navigation }) => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [acceptedPolicies, setAcceptedPolicies] = useState(false);
+  const [referralCode, setReferralCode] = useState('');
+
+  const navigateFromAuth = (target) => {
+    const parentNavigation = navigation.getParent?.();
+
+    if (parentNavigation?.replace) {
+      parentNavigation.replace(target);
+      return;
+    }
+
+    if (parentNavigation?.navigate) {
+      parentNavigation.navigate(target);
+      return;
+    }
+
+    navigation.replace(target);
+  };
 
   const handleSignup = async () => {
     // Validation
@@ -86,7 +103,19 @@ const SignupScreen = ({ navigation }) => {
         if (session) {
           await AsyncStorage.setItem('userToken', session.access_token);
           await AsyncStorage.setItem('userData', JSON.stringify(user));
-          navigation.replace('Onboarding');
+          
+          // Apply referral code if provided
+          if (referralCode.trim().length > 0) {
+            const { error: referralError } = await supabase.rpc('apply_referral_code', {
+              p_user_id: user.id,
+              p_referral_code: referralCode.trim().toUpperCase()
+            });
+            if (referralError) {
+              console.warn('Referral code application failed:', referralError.message);
+            }
+          }
+          
+          navigateFromAuth('Onboarding');
         }
       }
     } catch (err) {
@@ -169,6 +198,16 @@ const SignupScreen = ({ navigation }) => {
           <Ionicons name={showConfirmPassword ? 'eye' : 'eye-off'} size={20} color={Colors.textSecondary} />
         </TouchableOpacity>
       </View>
+
+      <Text style={AuthStyles.inputLabel}>Referral Code (Optional)</Text>
+      <TextInput
+        style={[AuthStyles.input, { marginBottom: 16 }]}
+        value={referralCode}
+        onChangeText={setReferralCode}
+        placeholder="Enter a friend's code for free Premium"
+        placeholderTextColor={Colors.textSecondary}
+        autoCapitalize="characters"
+      />
 
       <View style={{ flexDirection: 'row', alignItems: 'flex-start', marginBottom: 16 }}>
         <Switch

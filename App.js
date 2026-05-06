@@ -26,6 +26,15 @@ LogBox.ignoreLogs([
 
 const navigationRef = createNavigationContainerRef();
 
+const resetRootNavigation = (routeName, params) => {
+  if (!navigationRef.isReady()) return;
+
+  navigationRef.reset({
+    index: 0,
+    routes: [{ name: routeName, params }],
+  });
+};
+
 const App = () => {
   const [loading, setLoading] = useState(true);
   const [initialRoute, setInitialRoute] = useState('Auth');
@@ -37,9 +46,10 @@ const App = () => {
     const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_OUT') {
         setInitialRoute('Auth');
-        if (navigationRef.isReady()) {
-          navigationRef.reset({ index: 0, routes: [{ name: 'Auth' }] });
-        }
+        resetRootNavigation('Auth');
+      }
+      if (event === 'SIGNED_IN' && session?.user) {
+        checkSession();
       }
       if (event === 'PASSWORD_RECOVERY') {
         setTimeout(() => {
@@ -69,6 +79,7 @@ const App = () => {
       if (!session) {
         console.log('No session, routing to Auth');
         setInitialRoute('Auth');
+        resetRootNavigation('Auth');
         return;
       }
 
@@ -89,9 +100,11 @@ const App = () => {
         console.log('Profile incomplete, routing to:', step);
         setOnboardingScreen(step);
         setInitialRoute('Onboarding');
+        resetRootNavigation('Onboarding', { screen: step });
       } else {
         console.log('Fully onboarded, routing to Main');
         setInitialRoute('Main');
+        resetRootNavigation('Main');
         notificationService.registerForPushNotifications(session.user.id);
       }
 
@@ -103,6 +116,7 @@ const App = () => {
     } catch (error) {
       console.error('CRITICAL: Session check error:', error);
       setInitialRoute('Auth');
+      resetRootNavigation('Auth');
     } finally {
       setLoading(false);
       console.log('Session check complete');

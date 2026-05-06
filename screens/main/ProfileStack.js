@@ -842,22 +842,33 @@ const PremiumBanner = ({ onPress }) => {
 };
 
 // Fish Trap Profile Screen (for unverified users)
-const FishTrapProfileScreen = ({ navigation }) => {
+const FishTrapProfileScreen = ({ navigation, verificationStatus }) => {
+  const isPending = verificationStatus === 'pending';
+
   return (
     <View style={styles.lockedContainer}>
       <View style={styles.lockedIcon}>
-        <Text style={{ fontSize: 50 }}>🔒</Text>
+        <Text style={{ fontSize: 50 }}>{isPending ? '⏳' : '🔒'}</Text>
       </View>
-      <Text style={styles.lockedTitle}>Profile Locked</Text>
+      <Text style={styles.lockedTitle}>{isPending ? 'Verification Pending' : 'Profile Locked'}</Text>
       <Text style={styles.lockedText}>
-        Complete verification to see real profiles and connect with genuine people on Suyavaraa.
+        {isPending 
+          ? 'Our team is currently reviewing your verification video. This usually takes less than 24 hours.'
+          : 'Complete verification to see real profiles and connect with genuine people on Suyavaraa.'}
       </Text>
-      <TouchableOpacity 
-        style={styles.verifyButton}
-        onPress={() => navigation.navigate('Verification')}
-      >
-        <Text style={styles.verifyButtonText}>Complete Verification</Text>
-      </TouchableOpacity>
+      {!isPending && (
+        <TouchableOpacity 
+          style={styles.verifyButton}
+          onPress={() => navigation.navigate('Verification')}
+        >
+          <Text style={styles.verifyButtonText}>Complete Verification</Text>
+        </TouchableOpacity>
+      )}
+      {isPending && (
+        <View style={[styles.verifyButton, { backgroundColor: colors.surfaceLight, borderColor: colors.border }]}>
+          <Text style={[styles.verifyButtonText, { color: colors.textSecondary }]}>Under Review</Text>
+        </View>
+      )}
     </View>
   );
 };
@@ -868,6 +879,7 @@ const ProfileScreen = ({ navigation }) => {
   const { userMode, activeMode, switchMode, isPrivilegedOwner } = useMode();
   const [isPremium, setIsPremium] = useState(false);
   const [trustLevel, setTrustLevel] = useState('unverified');
+  const [verificationStatus, setVerificationStatus] = useState('unverified');
   const [preferredMode, setPreferredMode] = useState(null);
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({
@@ -903,7 +915,7 @@ const ProfileScreen = ({ navigation }) => {
 
       const { data: userData } = await supabase
         .from('users')
-        .select('id, full_name, city, bio, is_premium, premium_expires_at, trust_level, trust_score, is_verified, date_of_birth, preferred_mode')
+        .select('id, full_name, city, bio, is_premium, premium_expires_at, trust_level, trust_score, is_verified, verification_status, date_of_birth, preferred_mode')
         .eq('id', user.id)
         .single();
 
@@ -958,6 +970,7 @@ const ProfileScreen = ({ navigation }) => {
         setPreferredMode(userData.preferred_mode || 'zone');
         setIsPremium(isPrivilegedOwner ? true : isPremiumActive);
         setTrustLevel(userData.trust_level || 'unverified');
+        setVerificationStatus(userData.verification_status || (userData.is_verified ? 'verified' : 'unverified'));
         setCompletionPercentage(calculateCompletion(profileData, userData));
       }
 
@@ -1048,11 +1061,11 @@ const ProfileScreen = ({ navigation }) => {
     );
   }
 
-  const isUnverified = trustLevel === 'unverified' || trustLevel === 'pending';
+  const isUnverified = verificationStatus !== 'verified';
 
   // Redirect unverified users to FishTrap profile
   if (isUnverified && !isPremium) {
-    return <FishTrapProfileScreen navigation={navigation} />;
+    return <FishTrapProfileScreen navigation={navigation} verificationStatus={verificationStatus} />;
   }
 
   return (

@@ -51,6 +51,16 @@ const VideoVerificationScreen = ({ navigation }) => {
         });
 
       if (dbError) throw dbError;
+      
+      // 2.5 Update user status to pending so they don't see "Complete Verification" again
+      await supabase
+        .from('users')
+        .update({ 
+          verification_status: 'pending',
+          onboarding_step: 'ModeSelect',
+          updated_at: new Date()
+        })
+        .eq('id', user.id);
 
       // 3. Success!
       navigation.navigate('VerificationSuccess');
@@ -183,7 +193,10 @@ const styles = StyleSheet.create({
     borderRadius: 16, 
     alignItems: 'center',
     elevation: 4,
-    boxShadow: '0px 4px 8px rgba(217,119,6,0.2)',
+    shadowColor: Colors.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
   },
   primaryBtnFlat: { flex: 2, backgroundColor: Colors.primary, paddingVertical: 16, borderRadius: 16, alignItems: 'center' },
   primaryBtnText: { color: '#fff', fontSize: 18, fontWeight: 'bold' },

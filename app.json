@@ -20,6 +20,9 @@
           "remote-notification"
         ],
         "NSUserNotificationsUsageDescription": "This app uses notifications to alert you about new matches, messages, and important updates.",
+        "NSCameraUsageDescription": "Suyavaraa needs access to your camera so you can take profile photos and verify your identity.",
+        "NSPhotoLibraryUsageDescription": "Suyavaraa needs access to your photos so you can upload profile pictures from your gallery.",
+        "NSMicrophoneUsageDescription": "Suyavaraa needs access to your microphone for video verification features.",
         "ITSAppUsesNonExemptEncryption": false
       }
     },
@@ -30,7 +33,9 @@
       },
       "permissions": [
         "android.permission.RECEIVE_BOOT_COMPLETED",
-        "android.permission.VIBRATE"
+        "android.permission.VIBRATE",
+        "android.permission.CAMERA",
+        "android.permission.INTERNET"
       ],
       "package": "com.trusthub.suyavaraa",
       "versionCode": 1

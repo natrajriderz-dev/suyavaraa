@@ -22,6 +22,22 @@ const LoginScreen = ({ navigation }) => {
   const [error, setError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
 
+  const navigateFromAuth = (target) => {
+    const parentNavigation = navigation.getParent?.();
+
+    if (parentNavigation?.replace) {
+      parentNavigation.replace(target);
+      return;
+    }
+
+    if (parentNavigation?.navigate) {
+      parentNavigation.navigate(target);
+      return;
+    }
+
+    navigation.replace(target);
+  };
+
   const handleLogin = async () => {
     if (!email || !password) {
       setError('Please enter email and password');
@@ -65,9 +81,9 @@ const LoginScreen = ({ navigation }) => {
           .single();
 
         if (profile?.profile_complete) {
-          navigation.replace('Main');
+          navigateFromAuth('Main');
         } else {
-          navigation.replace('Onboarding');
+          navigateFromAuth('Onboarding');
         }
       } else if (!session && signInError?.message?.includes('Email not confirmed')) {
         // User exists but email not confirmed - show message with option to confirm

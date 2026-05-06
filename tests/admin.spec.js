@@ -50,7 +50,7 @@ test.describe('Admin Dashboard', () => {
     });
 
     // Navigate to the admin page
-    await page.goto('http://localhost:8081/admin.html');
+    await page.goto('/admin.html');
   });
 
   test('should load login form', async ({ page }) => {
@@ -90,7 +90,7 @@ test.describe('Admin Dashboard', () => {
     await expect(errorDiv).toBeVisible();
   });
 
-  test('should allow login form submission flow', async ({ page }) => {
+  test('should allow login and show dashboard', async ({ page }) => {
     await page.reload();
     await page.waitForTimeout(1000);
 
@@ -98,10 +98,9 @@ test.describe('Admin Dashboard', () => {
     await page.fill('input[type="password"]', 'password123');
     await page.click('button[type="submit"]');
 
-    // In offline/local test runs, app may stay on login due external SDK/network,
-    // but it must remain interactive and not crash.
-    await expect(page.locator('text=Admin Login')).toBeVisible();
-    await expect(page.locator('input[type="email"]')).toBeVisible();
+    // After successful login, the dashboard should appear
+    await page.waitForTimeout(1000);
+    await expect(page.locator('text=Suyavaraa Admin Safety Console')).toBeVisible();
   });
 
   test('should render login screen consistently after reload', async ({ page }) => {
