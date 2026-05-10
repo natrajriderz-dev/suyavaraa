@@ -48,6 +48,18 @@ yarn-error.*
 # Aider and AI tools
 .aider*
 
+# Python
+venv/
+__pycache__/
+*.pyc
+*.pyo
+
+# Backup files
+*.save
+
+# Test results
+test-results/
+
 # Testing and Reports
 playwright-report/
 test-results/
