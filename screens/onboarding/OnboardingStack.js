@@ -36,6 +36,7 @@ const { useMode } = require('../../context/ModeContext');
 
 // Import modular screens
 const BasicInfoScreen = require('../../src/screens/auth/BasicInfoScreen');
+const MobileOtpVerificationScreen = require('../../src/screens/auth/MobileOtpVerificationScreen');
 const VideoVerificationScreen = require('../../src/screens/auth/VideoVerificationScreen');
 const VerificationSuccessScreen = require('../../src/screens/auth/VerificationSuccessScreen');
 
@@ -1204,12 +1205,17 @@ const OnboardingRouter = ({ navigation }) => {
 
       const { data: userData } = await supabase
         .from('users')
-        .select('full_name, verification_status, profile_complete, onboarding_step')
+        .select('full_name, verification_status, profile_complete, onboarding_step, phone_verification_status')
         .eq('id', user.id)
         .single();
 
       if (!userData?.full_name) {
         navigation.replace('BasicInfo');
+        return;
+      }
+
+      if (!userData?.phone_verification_status || userData.phone_verification_status !== 'verified') {
+        navigation.replace('MobileOtpVerification');
         return;
       }
 
@@ -1268,6 +1274,11 @@ const OnboardingStack = ({ route }) => {
         name="BasicInfo" 
         component={BasicInfoScreen} 
         options={{ title: 'Profile Info' }}
+      />
+      <Stack.Screen 
+        name="MobileOtpVerification"
+        component={MobileOtpVerificationScreen}
+        options={{ title: 'Mobile OTP' }}
       />
       <Stack.Screen 
         name="VideoVerification" 

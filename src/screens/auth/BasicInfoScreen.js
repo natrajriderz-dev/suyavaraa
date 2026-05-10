@@ -171,7 +171,7 @@ const BasicInfoScreen = ({ navigation, route }) => {
           gender: gender.toLowerCase(),
           city: city.trim(),
           profile_complete: false,
-          onboarding_step: 'VideoVerification',
+          onboarding_step: 'MobileOtpVerification',
         }, {
           onConflict: 'id'
         });
@@ -204,7 +204,7 @@ const BasicInfoScreen = ({ navigation, route }) => {
       }
 
       await AsyncStorage.setItem('onboarding_complete', 'false'); // Still need verification
-      navigation.replace('VideoVerification');
+      navigation.replace('MobileOtpVerification');
     } catch (err) {
       console.error('Save Profile Error:', err);
       let errorMessage = err.message || 'Failed to save profile';

@@ -14,12 +14,13 @@ const { useState } = React;
 const { Ionicons } = require('@expo/vector-icons');
 const Colors = require('../../theme/Colors');
 const CameraCapture = require('../../components/video/CameraCapture');
-const { supabase } = require('../../../supabase');
-const { uploadMedia } = require('../../utils/mediaUtils');
+const { pickMedia } = require('../../utils/mediaUtils');
+const verificationService = require('../../services/verificationService');
 
 const VideoVerificationScreen = ({ navigation }) => {
   const [step, setStep] = useState(1); // 1: Instructions, 2: Capture, 3: Review
   const [capturedMedia, setCapturedMedia] = useState(null);
+  const [idCardMedia, setIdCardMedia] = useState(null);
   const [loading, setLoading] = useState(false);
 
   const handleCapture = (media) => {
@@ -32,39 +33,11 @@ const VideoVerificationScreen = ({ navigation }) => {
     setLoading(true);
 
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Not authenticated');
-
-      const fileExt = capturedMedia.name ? capturedMedia.name.split('.').pop() : 'jpg';
-      const fileName = `${user.id}_${Date.now()}.${fileExt}`;
-      const filePath = `verifications/${fileName}`;
-      const mediaUrl = await uploadMedia(capturedMedia.uri, 'verification_media', filePath);
-
-      // 2. Register verification request in DB
-      const { error: dbError } = await supabase
-        .from('verification_requests')
-        .insert({
-          user_id: user.id,
-          media_url: mediaUrl,
-          status: 'pending',
-          created_at: new Date()
-        });
-
-      if (dbError) throw dbError;
-      
-      // 2.5 Update user status to pending so they don't see "Complete Verification" again
-      await supabase
-        .from('users')
-        .update({ 
-          verification_status: 'pending',
-          onboarding_step: 'ModeSelect',
-          updated_at: new Date()
-        })
-        .eq('id', user.id);
-
-      // 3. Success!
+      await verificationService.submitVerificationRequest({
+        capturedMedia,
+        idCardMedia,
+      });
       navigation.navigate('VerificationSuccess');
-
     } catch (error) {
       console.error('Upload error:', error);
       const message = error.message?.includes('bucket')
@@ -76,15 +49,22 @@ const VideoVerificationScreen = ({ navigation }) => {
     }
   };
 
+  const pickIdCard = async () => {
+    const result = await pickMedia('library', true, 'image');
+    if (result) {
+      setIdCardMedia(result);
+    }
+  };
+
   const Instructions = () => (
     <View style={styles.content}>
       <View style={styles.iconCircle}>
         <Ionicons name="shield-checkmark" size={60} color={Colors.primary} />
       </View>
-      <Text style={styles.title}>Secure Verification</Text>
+      <Text style={styles.title}>Selfie Verification</Text>
       <Text style={styles.desc}>
-        To ensure a safe community, we require a quick video verification. 
-        This prevents fake profiles and protects all users.
+        To ensure a safe community, we require a quick selfie or short video verification.
+        You can also add an optional ID card upload for faster admin review.
       </Text>
       <View style={styles.bulletList}>
         <View style={styles.bulletRow}>
@@ -97,9 +77,21 @@ const VideoVerificationScreen = ({ navigation }) => {
         </View>
         <View style={styles.bulletRow}>
           <Ionicons name="checkmark-circle" size={24} color={Colors.success} style={{ marginRight: 16 }} />
-          <Text style={styles.bulletText}>Speak the numbers on screen (optional)</Text>
+          <Text style={styles.bulletText}>Tap for selfie or hold for a short video</Text>
+        </View>
+        <View style={styles.bulletRow}>
+          <Ionicons name="card" size={24} color={Colors.success} style={{ marginRight: 16 }} />
+          <Text style={styles.bulletText}>Optional: upload your ID card for admin review</Text>
         </View>
       </View>
+      <TouchableOpacity style={styles.secondaryCta} onPress={pickIdCard}>
+        <Text style={styles.secondaryCtaText}>
+          {idCardMedia ? 'Replace Optional ID Card' : 'Upload Optional ID Card'}
+        </Text>
+      </TouchableOpacity>
+      {idCardMedia ? (
+        <Text style={styles.metaText}>ID file attached: {idCardMedia.name || 'selected document'}</Text>
+      ) : null}
       <TouchableOpacity 
         testID="start-capturing-button"
         style={styles.primaryBtn} 
@@ -118,8 +110,15 @@ const VideoVerificationScreen = ({ navigation }) => {
         <Text style={styles.reviewSub}>Media Captured Successfully</Text>
       </View>
       <Text style={styles.desc}>
-        Is your face clearly visible? If yes, click Submit for review.
+        Is your face clearly visible? If yes, submit this for admin review.
       </Text>
+      {idCardMedia ? (
+        <Text style={styles.metaText}>Optional ID card is attached and will be reviewed by the admin team.</Text>
+      ) : (
+        <TouchableOpacity style={styles.secondaryCta} onPress={pickIdCard}>
+          <Text style={styles.secondaryCtaText}>Attach Optional ID Card</Text>
+        </TouchableOpacity>
+      )}
       <View style={styles.buttonRow}>
         <TouchableOpacity 
           testID="retake-video-button"
@@ -203,8 +202,11 @@ const styles = StyleSheet.create({
   buttonRow: { flexDirection: 'row', width: '100%' },
   secondaryBtn: { flex: 1, paddingVertical: 16, borderRadius: 16, alignItems: 'center', borderWidth: 1, borderColor: Colors.border },
   secondaryBtnText: { fontSize: 18, color: Colors.textSecondary },
+  secondaryCta: { width: '100%', paddingVertical: 14, borderRadius: 16, alignItems: 'center', borderWidth: 1, borderColor: Colors.primary, marginBottom: 16 },
+  secondaryCtaText: { fontSize: 16, fontWeight: '600', color: Colors.primary },
   reviewPlaceholder: { width: '100%', height: 300, backgroundColor: Colors.surface, borderRadius: 20, justifyContent: 'center', alignItems: 'center', marginBottom: 24, borderWidth: 1, borderColor: Colors.border },
   reviewSub: { marginTop: 16, fontSize: 14, color: Colors.textSecondary },
+  metaText: { fontSize: 14, color: Colors.textSecondary, textAlign: 'center', marginBottom: 20 },
 });
 
 module.exports = VideoVerificationScreen;

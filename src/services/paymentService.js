@@ -24,32 +24,15 @@ class PaymentService {
 
   /**
    * Handle successful payment (Webhook or Redirect callback)
-   * This should be called to update the user_profiles or users table.
+   * SECURITY UPDATE: Client-side granting of premium is disabled. 
+   * This must be handled by a secure server-side webhook.
    */
   async grantPremiumAccess(userId, planId) {
-    try {
-      const expirationDate = new Date();
-      if (planId === 'monthly') {
-        expirationDate.setMonth(expirationDate.getMonth() + 1);
-      } else {
-        expirationDate.setFullYear(expirationDate.getFullYear() + 1);
-      }
-
-      const { error } = await supabase
-        .from('users')
-        .update({ 
-          is_premium: true,
-          premium_expires_at: expirationDate.toISOString()
-        })
-        .eq('id', userId);
-
-      if (error) throw error;
-      return { success: true };
-
-    } catch (error) {
-      console.error('Failed to grant premium access:', error);
-      return { success: false, error: error.message };
-    }
+    console.error('SECURITY VIOLATION: Attempted to grant premium access from the client.');
+    return { 
+      success: false, 
+      error: 'Premium access must be granted via secure server webhook.' 
+    };
   }
 }
 

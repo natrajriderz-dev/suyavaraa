@@ -201,6 +201,8 @@ const AdminScreen = () => {
   const pendingReports = data.reports.filter((r) => r.status === 'pending');
   const pendingVerifications = data.verificationQueue.length;
   const suspiciousScans = data.deepfakeScans.filter((s) => ['deepfake', 'nsfw', 'suspicious'].includes(s.result)).length;
+  const canReviewVerifications = adminUser.permissions?.includes('*') || adminUser.permissions?.includes('verifications:review');
+  const canModerateUsers = adminUser.permissions?.includes('*') || adminUser.permissions?.includes('users:moderate');
 
   const renderTab = (label) => (
     <TouchableOpacity
@@ -224,6 +226,11 @@ const AdminScreen = () => {
         <StatCard label="Pending Posts" value={data.pendingPosts.length} tone="danger" />
         <StatCard label="Escalated Support" value={data.escalatedSupport.length} tone="warning" />
         <StatCard label="Active Admins" value={data.adminTeam.length} tone="info" />
+      </View>
+
+      <View style={styles.summaryStrip}>
+        <Text style={styles.summaryText}>Role: {adminUser.role}</Text>
+        <Text style={styles.summaryText}>Flagged scans: {suspiciousScans}</Text>
       </View>
     </>
   );
@@ -261,6 +268,31 @@ const AdminScreen = () => {
         </View>
       ))}
       {data.pendingPhotos.length === 0 ? <EmptyLine text="No pending photos" /> : null}
+    </Section>
+  );
+
+  const renderVerificationQueue = () => (
+    <Section title="Verification Review Queue">
+      {data.verificationQueue.map((item) => (
+        <View key={item.id} style={styles.card}>
+          <Text style={styles.cardTitle}>User: {shortId(item.user_id)}</Text>
+          <Text style={styles.cardMeta}>
+            {item.request_type || 'selfie_only'} • {item.phone_number || 'no phone'}
+          </Text>
+          <Text style={styles.cardBody}>Selfie/Video: {item.selfie_url || item.media_url || 'Not available'}</Text>
+          <Text style={styles.cardBody}>ID Card: {item.id_card_url || 'Not attached'}</Text>
+          <Text style={styles.time}>{fmt(item.created_at)}</Text>
+          {canReviewVerifications ? (
+            <View style={styles.actionsRow}>
+              <SmallBtn text="Approve" onPress={() => handleVerification(item, true)} />
+              <SmallBtn text="Reject" kind="muted" onPress={() => handleVerification(item, false)} />
+            </View>
+          ) : (
+            <Text style={styles.readOnlyText}>Executive view: read-only verification access.</Text>
+          )}
+        </View>
+      ))}
+      {data.verificationQueue.length === 0 ? <EmptyLine text="No pending verification requests" /> : null}
     </Section>
   );
 
@@ -314,13 +346,18 @@ const AdminScreen = () => {
             <Text style={styles.cardTitle}>{user.full_name || user.email}</Text>
             <Text style={styles.cardMeta}>{user.email}</Text>
             <Text style={styles.cardBody}>Trust: {user.trust_score ?? '—'} · Status: {user.is_banned ? 'Banned' : 'Active'}</Text>
+            <Text style={styles.cardBody}>Verification: {user.verification_status || (user.is_verified ? 'verified' : 'unverified')} · Phone: {user.phone_verification_status || 'unverified'} · ID: {user.id_verification_status || 'not_submitted'}</Text>
             <Text style={styles.time}>{fmt(user.created_at)}</Text>
-            <View style={styles.actionsRow}>
-              <SmallBtn
-                text={user.is_banned ? 'Unban' : 'Ban'}
-                onPress={() => handleBanUser(user.id, !user.is_banned)}
-              />
-            </View>
+            {canModerateUsers ? (
+              <View style={styles.actionsRow}>
+                <SmallBtn
+                  text={user.is_banned ? 'Unban' : 'Ban'}
+                  onPress={() => handleBanUser(user.id, !user.is_banned)}
+                />
+              </View>
+            ) : (
+              <Text style={styles.readOnlyText}>Executive view: moderation controls are disabled.</Text>
+            )}
           </View>
         ))}
         {results.length === 0 ? <EmptyLine text="No matching users" /> : null}
@@ -331,7 +368,7 @@ const AdminScreen = () => {
   const renderTeamSettings = () => (
     <Section title="Admin Team Settings">
       {data.adminTeam.map((item) => (
-        <View key={item.id} style={styles.card}>
+        <View key={item.user_id} style={styles.card}>
           <Text style={styles.cardTitle}>{item.role.toUpperCase()}</Text>
           <Text style={styles.cardMeta}>User ID: {shortId(item.user_id)}</Text>
           <Text style={styles.cardBody}>Active: {item.is_active ? 'Yes' : 'No'}</Text>
@@ -362,6 +399,8 @@ const AdminScreen = () => {
         return renderOverview();
       case 'Reports':
         return renderReportsSection();
+      case 'Verification':
+        return renderVerificationQueue();
       case 'Photos':
         return renderPhotoQueue();
       case 'Posts':
@@ -390,7 +429,7 @@ const AdminScreen = () => {
       </View>
 
       <ScrollView horizontal contentContainerStyle={styles.tabBar} showsHorizontalScrollIndicator={false}>
-        {['Overview', 'Reports', 'Photos', 'Posts', 'Support', 'Users', 'Team', 'Activity'].map(renderTab)}
+        {['Overview', 'Reports', 'Verification', 'Photos', 'Posts', 'Support', 'Users', 'Team', 'Activity'].map(renderTab)}
       </ScrollView>
 
       {sectionContent}
@@ -436,6 +475,8 @@ const styles = StyleSheet.create({
   statInfo: { borderColor: '#bfdbfe', backgroundColor: '#eff6ff' },
   statValue: { fontSize: 20, fontWeight: '800', color: '#0f172a' },
   statLabel: { marginTop: 2, fontSize: 11, color: '#475569' },
+  summaryStrip: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 18, marginTop: 10 },
+  summaryText: { color: '#475569', fontSize: 12, fontWeight: '600' },
   section: { marginTop: 14, paddingHorizontal: 12, paddingBottom: 4 },
   sectionTitle: { fontSize: 16, fontWeight: '700', color: '#0f172a', marginBottom: 8, marginLeft: 2 },
   tabBar: { paddingHorizontal: 12, paddingVertical: 8, backgroundColor: '#ffffff' },
@@ -456,6 +497,7 @@ const styles = StyleSheet.create({
   smallBtnText: { color: '#ffffff', fontWeight: '700', fontSize: 12 },
   smallBtnTextMuted: { color: '#334155' },
   emptyLine: { color: '#64748b', fontSize: 12, marginTop: 2, marginLeft: 4 },
+  readOnlyText: { color: '#64748b', fontSize: 12, marginTop: 10 },
 });
 
 module.exports = AdminScreen;

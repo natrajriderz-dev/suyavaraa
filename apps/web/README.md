@@ -1,36 +1,34 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Suyavaraa Web
 
-## Getting Started
+This is the Vercel-ready web app for Suyavaraa.
 
-First, run the development server:
+## Deploy On Vercel
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+1. Import this repository into Vercel.
+2. Set the project **Root Directory** to `apps/web`.
+3. Keep the detected framework as **Next.js**.
+4. Deploy once to get a preview URL.
+5. After preview looks good, attach `suyavaraa.in` and `www.suyavaraa.in`.
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Expected Commands
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+- Install: `npm install`
+- Build: `npm run build`
+- Local dev: `npm run dev`
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Domain Notes
 
-## Learn More
+- Add `suyavaraa.in` in the Vercel Domains section.
+- Add `www.suyavaraa.in` too if you want the `www` version.
+- Update DNS at your domain registrar after Vercel shows the required records.
 
-To learn more about Next.js, take a look at the following resources:
+## Current Scope
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+This app is a branded landing page prepared for deployment so you can verify:
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- Vercel project setup
+- domain connection
+- live web URL behavior
+- basic production metadata and styling
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+The full product trust flow still primarily lives in the mobile app and Supabase backend.

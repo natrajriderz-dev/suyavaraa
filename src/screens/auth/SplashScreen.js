@@ -2,7 +2,8 @@
 const React = require('react');
 const { View, Text, ActivityIndicator, Image } = require('react-native');
 const { useState, useEffect } = React;
-const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+// SECURITY: Use SecureStore instead of AsyncStorage
+const SecureStore = require('expo-secure-store');
 const Colors = require('../../theme/Colors');
 const AuthStyles = require('./AuthStyles');
 
@@ -13,10 +14,10 @@ const SplashScreen = ({ navigation }) => {
     const checkSession = async () => {
       try {
         await new Promise(resolve => setTimeout(resolve, 2000));
-        const token = await AsyncStorage.getItem('userToken');
-        const userData = await AsyncStorage.getItem('userData');
+        // We only check for the token now.
+        const token = await SecureStore.getItemAsync('userToken');
 
-        if (token && userData) {
+        if (token) {
           // In a real app, confirm session with Supabase here
         }
         navigation.replace('Landing');

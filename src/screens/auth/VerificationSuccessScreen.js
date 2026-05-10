@@ -34,8 +34,8 @@ const VerificationSuccessScreen = ({ navigation }) => {
         </View>
         <Text style={styles.title}>Submission Received!</Text>
         <Text style={styles.desc}>
-          Thank you for verifying. Our admin team will review your video within 24 hours. 
-          You can continue exploring the community in the meantime.
+          Thank you for verifying. Our admin team will review your selfie or video submission,
+          along with any optional ID card you attached, within 24 hours.
         </Text>
         <TouchableOpacity 
           style={styles.primaryBtn} 

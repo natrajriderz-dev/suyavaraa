@@ -3,28 +3,19 @@ require('react-native-url-polyfill/auto');
 const AsyncStorage = require('@react-native-async-storage/async-storage').default;
 const { createClient } = require('@supabase/supabase-js');
 
-const DEFAULT_SUPABASE_URL = 'https://tlssfmtiwzdbvxchrfzq.supabase.co';
-const DEFAULT_SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRsc3NmbXRpd3pkYnZ4Y2hyZnpxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY1OTI2NjUsImV4cCI6MjA5MjE2ODY2NX0.5Q7ObjrVryop3ON3inB7yaGSR6iqtCPfZvOpjZVX-Ck';
-
-// Expo inlines EXPO_PUBLIC_* variables at build time. Keep a fallback so preview
-// builds still work, but surface clearly when a deployment forgot to set env vars.
-const envSupabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
-const envSupabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
-const supabaseUrl = envSupabaseUrl || DEFAULT_SUPABASE_URL;
-const supabaseAnonKey = envSupabaseAnonKey || DEFAULT_SUPABASE_ANON_KEY;
-const usingFallbackConfig = !envSupabaseUrl || !envSupabaseAnonKey;
-const supabaseProjectHost = supabaseUrl.replace(/^https?:\/\//, '');
+// SECURITY: Credentials must come from environment variables only.
+// Set EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY via EAS Secrets
+// or your .env file. Never hardcode keys in source code.
+const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
+const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
+const supabaseProjectHost = supabaseUrl
+  ? supabaseUrl.replace(/^https?:\/\//, '')
+  : 'unknown';
 
 if (!supabaseUrl || !supabaseAnonKey) {
-  console.error('❌ CRITICAL: Supabase credentials not found in environment');
-  console.error('URL:', supabaseUrl);
-  console.error('Key:', supabaseAnonKey ? 'SET' : 'MISSING');
-}
-
-if (usingFallbackConfig) {
-  console.warn(
-    `[Supabase] Using bundled fallback config for ${supabaseProjectHost}. ` +
-    'Set EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY in EAS/Vercel to avoid deployment drift.'
+  console.error(
+    '❌ CRITICAL: Supabase credentials missing. ' +
+    'Set EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY in your environment.'
   );
 }
 
@@ -54,6 +45,5 @@ module.exports = {
   supabaseConfig: {
     url: supabaseUrl,
     projectHost: supabaseProjectHost,
-    usingFallbackConfig,
   },
 };

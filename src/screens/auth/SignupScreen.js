@@ -11,11 +11,13 @@ const {
   Switch,
 } = require('react-native');
 const { useState } = React;
-const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+// SECURITY: Use SecureStore instead of AsyncStorage for tokens
+const SecureStore = require('expo-secure-store');
 const { supabase } = require('../../../supabase');
 const { Ionicons } = require('@expo/vector-icons');
 const AuthStyles = require('./AuthStyles');
 const Colors = require('../../theme/Colors');
+const verificationService = require('../../services/verificationService');
 
 const SignupScreen = ({ navigation }) => {
   const [email, setEmail] = useState('');
@@ -44,6 +46,15 @@ const SignupScreen = ({ navigation }) => {
     navigation.replace(target);
   };
 
+  const validatePassword = (pass) => {
+    const minLength = 8;
+    const hasNumber = /\d/.test(pass);
+    const hasUpper = /[A-Z]/.test(pass);
+    const hasLower = /[a-z]/.test(pass);
+    const hasSpecial = /[!@#$%^&*(),.?":{}|<>]/.test(pass);
+    return pass.length >= minLength && hasNumber && hasUpper && hasLower && hasSpecial;
+  };
+
   const handleSignup = async () => {
     // Validation
     if (!email || !password || !confirmPassword) {
@@ -56,8 +67,8 @@ const SignupScreen = ({ navigation }) => {
       return;
     }
 
-    if (password.length < 6) {
-      setError('Password must be at least 6 characters');
+    if (!validatePassword(password)) {
+      setError('Password must be at least 8 characters and include uppercase, lowercase, number, and special character');
       return;
     }
 
@@ -71,6 +82,9 @@ const SignupScreen = ({ navigation }) => {
       return;
     }
 
+    // Basic sanitization for referral code
+    const cleanReferralCode = referralCode.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+
     setLoading(true);
     setError('');
 
@@ -80,9 +94,9 @@ const SignupScreen = ({ navigation }) => {
         email: email.trim(),
         password: password,
         options: {
-          emailRedirectTo: 'suyavaraa://login-callback',
+          emailRedirectTo: verificationService.EMAIL_REDIRECT_URL,
           data: {
-            email_confirmed: true, // Auto-confirm email
+            email_confirmed: false, // Force email confirmation for security
             accepted_terms_at: new Date().toISOString(),
             accepted_privacy_at: new Date().toISOString(),
           }
@@ -91,40 +105,46 @@ const SignupScreen = ({ navigation }) => {
 
       if (signUpError) throw signUpError;
 
-      if (user) {
-        // Auto-log user in after signup
-        const { data: { session }, error: autoLoginError } = await supabase.auth.signInWithPassword({
-          email: email.trim(),
-          password: password
-        });
+      // Don't auto-login if email confirmation is required.
+      // The user should check their email.
+      if (user && user.identities && user.identities.length === 0) {
+        setError('An account with this email already exists.');
+        setLoading(false);
+        return;
+      }
 
-        if (autoLoginError) throw autoLoginError;
+      Alert.alert(
+        "Verification Email Sent",
+        "Please check your email to verify your account before logging in.",
+        [{ text: "OK", onPress: () => navigation.navigate('Login') }]
+      );
 
-        if (session) {
-          await AsyncStorage.setItem('userToken', session.access_token);
-          await AsyncStorage.setItem('userData', JSON.stringify(user));
+      // If we somehow still auto-logged in (e.g. email confirmation disabled in Supabase),
+      // handle the token storage securely.
+      const { data: sessionData } = await supabase.auth.getSession();
+      if (sessionData?.session) {
+          await SecureStore.setItemAsync('userToken', sessionData.session.access_token);
           
           // Apply referral code if provided
-          if (referralCode.trim().length > 0) {
+          if (cleanReferralCode.length > 0) {
             const { error: referralError } = await supabase.rpc('apply_referral_code', {
               p_user_id: user.id,
-              p_referral_code: referralCode.trim().toUpperCase()
+              p_referral_code: cleanReferralCode
             });
             if (referralError) {
-              console.warn('Referral code application failed:', referralError.message);
+               // Silently fail for the user, log securely if needed
+               console.debug('Referral application skipped');
             }
           }
-          
           navigateFromAuth('Onboarding');
-        }
       }
+
     } catch (err) {
-      console.error('Signup Error:', err);
-      const { supabaseConfig } = require('../../../supabase');
+      // Don't log full error objects in production
       let errorMessage = err.message || 'Failed to create account';
       
-      if (errorMessage.includes('Network request failed')) {
-        errorMessage = `Network Error: Cannot reach ${supabaseConfig.projectHost}. Please check your internet.`;
+      if (errorMessage.includes('Network request failed') || errorMessage.includes('fetch')) {
+        errorMessage = 'Network Error: Please check your internet connection.';
       }
       
       setError(errorMessage);
@@ -241,6 +261,20 @@ const SignupScreen = ({ navigation }) => {
 
       <TouchableOpacity onPress={() => navigation.navigate('Login')}>
         <Text style={[AuthStyles.linkText, { textAlign: 'center', marginTop: 24 }]}>Already have an account? Login</Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        onPress={async () => {
+          try {
+            await verificationService.resendSignupVerificationEmail(email);
+            setError('');
+            Alert.alert('Verification Email Sent', 'We sent a fresh verification email to your inbox.');
+          } catch (err) {
+            setError(err.message || 'Unable to resend verification email.');
+          }
+        }}
+      >
+        <Text style={[AuthStyles.linkText, { textAlign: 'center', marginTop: 12 }]}>Resend verification email</Text>
       </TouchableOpacity>
 
       {loading && (

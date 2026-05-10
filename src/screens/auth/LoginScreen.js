@@ -9,11 +9,13 @@ const {
   ActivityIndicator,
 } = require('react-native');
 const { useState } = React;
-const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+// SECURITY: Use SecureStore instead of AsyncStorage for tokens
+const SecureStore = require('expo-secure-store');
 const { supabase } = require('../../../supabase');
 const { Ionicons } = require('@expo/vector-icons');
 const AuthStyles = require('./AuthStyles');
 const Colors = require('../../theme/Colors');
+const verificationService = require('../../services/verificationService');
 
 const LoginScreen = ({ navigation }) => {
   const [email, setEmail] = useState('');
@@ -58,20 +60,21 @@ const LoginScreen = ({ navigation }) => {
         password: password
       });
 
-      // Handle email not confirmed error - bypass for internal/testing
-      if (signInError?.message?.includes('Email not confirmed')) {
-        console.warn('Email not confirmed, attempting bypass...');
-        // This allows users to proceed even if email isn't confirmed
-        // In production, you should send a confirmation email instead
-      }
-
-      if (signInError && !signInError?.message?.includes('Email not confirmed')) {
+      if (signInError) {
         throw signInError;
       }
 
       if (session && user) {
-        await AsyncStorage.setItem('userToken', session.access_token);
-        await AsyncStorage.setItem('userData', JSON.stringify(user));
+        if (!user.email_confirmed_at) {
+          await supabase.auth.signOut();
+          setError('Please verify your email before logging in.');
+          return;
+        }
+
+        await verificationService.syncEmailVerificationState(user);
+
+        // Only store token securely. Don't store the full user object.
+        await SecureStore.setItemAsync('userToken', session.access_token);
 
         // Check if profile is complete
         const { data: profile } = await supabase
@@ -85,17 +88,13 @@ const LoginScreen = ({ navigation }) => {
         } else {
           navigateFromAuth('Onboarding');
         }
-      } else if (!session && signInError?.message?.includes('Email not confirmed')) {
-        // User exists but email not confirmed - show message with option to confirm
-        setError('Please verify your email. Check your inbox for the confirmation link.');
       }
     } catch (err) {
-      console.error('Login Error:', err);
-      const { supabaseConfig } = require('../../../supabase');
+      // Don't log full error details in production
       let errorMessage = err.message || 'Failed to login';
       
       if (errorMessage.includes('Network request failed') || errorMessage.includes('fetch')) {
-        errorMessage = `Network Error: Cannot reach ${supabaseConfig.projectHost}. Please check your internet.`;
+        errorMessage = 'Network Error: Please check your internet connection.';
       }
       
       setError(errorMessage);
@@ -159,6 +158,19 @@ const LoginScreen = ({ navigation }) => {
 
       <TouchableOpacity onPress={() => navigation.navigate('Signup')}>
         <Text style={[AuthStyles.linkText, { textAlign: 'center', marginTop: 24 }]}>Don't have an account? Sign up</Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        onPress={async () => {
+          try {
+            await verificationService.resendSignupVerificationEmail(email);
+            setError('');
+          } catch (err) {
+            setError(err.message || 'Unable to resend verification email.');
+          }
+        }}
+      >
+        <Text style={[AuthStyles.linkText, { textAlign: 'center', marginTop: 12 }]}>Resend verification email</Text>
       </TouchableOpacity>
 
       {loading && (

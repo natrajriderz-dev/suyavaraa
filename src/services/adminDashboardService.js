@@ -52,17 +52,30 @@ async function getCurrentAdminUser() {
 
   const { data, error } = await supabase
     .from('admin_users')
-    .select('user_id, role')
+    .select('user_id, role, permissions, is_active')
     .eq('user_id', user.id)
     .maybeSingle();
 
   if (error) throw error;
-  if (!data) return null;
+  if (!data || data.is_active === false) return null;
+
+  const basePermissions = (() => {
+    if (data.role === 'super_admin') return ['*'];
+    if (data.role === 'admin') return ['dashboard:view', 'users:view', 'users:moderate', 'verifications:view', 'verifications:review', 'content:moderate', 'activity:view'];
+    if (data.role === 'executive') return ['dashboard:view', 'users:view', 'verifications:view', 'activity:view'];
+    return [];
+  })();
+
+  const customPermissions = Array.isArray(data.permissions) ? data.permissions : [];
+  const permissions = basePermissions.includes('*')
+    ? ['*']
+    : Array.from(new Set([...basePermissions, ...customPermissions]));
 
   return {
     id: user.id,
     email: user.email,
     role: data.role || 'admin',
+    permissions,
   };
 }
 
@@ -81,7 +94,7 @@ async function loadAdminDashboardData() {
   ] = await Promise.all([
     supabase
       .from('users')
-      .select('id, full_name, email, is_banned, ban_reason, ban_expires_at, trust_score, trust_level, is_verified, created_at')
+      .select('id, full_name, email, is_banned, ban_reason, ban_expires_at, trust_score, trust_level, is_verified, verification_status, phone_number, phone_verification_status, id_verification_status, created_at')
       .order('created_at', { ascending: false })
       .limit(50),
     supabase
@@ -111,7 +124,7 @@ async function loadAdminDashboardData() {
       .limit(30),
     supabase
       .from('verification_requests')
-      .select('id, user_id, media_url, status, created_at')
+      .select('id, user_id, media_url, selfie_url, id_card_url, phone_number, request_type, status, metadata, created_at')
       .eq('status', 'pending')
       .order('created_at', { ascending: true })
       .limit(20),
@@ -267,7 +280,7 @@ async function searchUsers(query, limit = 30) {
   const filter = `%${query.trim()}%`;
   const { data, error } = await supabase
     .from('users')
-    .select('id, full_name, email, is_banned, ban_reason, ban_expires_at, trust_score, trust_level, created_at')
+    .select('id, full_name, email, is_banned, ban_reason, ban_expires_at, trust_score, trust_level, verification_status, phone_number, phone_verification_status, id_verification_status, created_at')
     .or(`full_name.ilike.${filter},email.ilike.${filter}`)
     .order('created_at', { ascending: false })
     .limit(limit);
@@ -282,7 +295,7 @@ async function searchUsers(query, limit = 30) {
 async function getAdminTeam(limit = 20) {
   const result = await safeSelect(
     'admin_users',
-    'id, user_id, role, permissions, is_active, created_at',
+    'user_id, role, permissions, is_active, created_at',
     (q) => q.order('created_at', { ascending: false }).limit(limit)
   );
   return result.data || [];
@@ -330,12 +343,13 @@ async function closeFeedback(feedbackId, adminId, reply) {
 
 async function processVerification(row, adminId, approved) {
   const status = approved ? 'approved' : 'rejected';
+  const now = new Date().toISOString();
 
   const updateRes = await supabase
     .from('verification_requests')
     .update({
       status,
-      reviewed_at: new Date().toISOString(),
+      reviewed_at: now,
       reviewed_by: adminId,
     })
     .eq('id', row.id);
@@ -345,7 +359,26 @@ async function processVerification(row, adminId, approved) {
   if (approved) {
     const userRes = await supabase
       .from('users')
-      .update({ is_verified: true, trust_level: 'green_verified' })
+      .update({
+        is_verified: true,
+        verification_status: 'verified',
+        selfie_verified_at: now,
+        trust_level: 'green_verified',
+        id_card_url: row.id_card_url || null,
+        id_verification_status: row.id_card_url ? 'verified' : 'not_submitted',
+        updated_at: now,
+      })
+      .eq('id', row.user_id);
+
+    if (userRes.error) return userRes;
+  } else {
+    const userRes = await supabase
+      .from('users')
+      .update({
+        verification_status: 'rejected',
+        id_verification_status: row.id_card_url ? 'rejected' : 'not_submitted',
+        updated_at: now,
+      })
       .eq('id', row.user_id);
 
     if (userRes.error) return userRes;
@@ -412,7 +445,7 @@ async function getDetailedUser(userId) {
   const [userRes, profileRes] = await Promise.all([
     supabase
       .from('users')
-      .select('id, full_name, email, date_of_birth, gender, city, bio, profile_complete, is_verified, is_banned, ban_reason, ban_expires_at, trust_score, trust_level, role, is_premium, created_at')
+      .select('id, full_name, email, date_of_birth, gender, city, bio, profile_complete, is_verified, verification_status, phone_number, phone_verification_status, email_verification_status, id_verification_status, id_card_url, is_banned, ban_reason, ban_expires_at, trust_score, trust_level, role, is_premium, created_at')
       .eq('id', userId)
       .single(),
     supabase
