@@ -1,3 +1,6 @@
+const webAppUrl = process.env.NEXT_PUBLIC_WEB_APP_URL || "https://suyavaraa.vercel.app";
+const apkUrl = process.env.NEXT_PUBLIC_APK_URL || "/suyavaraa.apk";
+
 const trustSignals = [
   "Gmail verification before login",
   "Mobile OTP onboarding",
@@ -49,16 +52,18 @@ export default function Home() {
 
             <div className="mt-8 flex flex-col gap-4 sm:flex-row">
               <a
-                href="#trust"
+                href={webAppUrl}
+                target="_blank"
+                rel="noreferrer"
                 className="rounded-full bg-accent px-6 py-3 text-center text-sm font-semibold text-white shadow-[0_18px_40px_rgba(180,83,9,0.25)] transition hover:-translate-y-0.5 hover:bg-accent-deep"
               >
-                Explore Trust Layers
+                Use Web Version
               </a>
               <a
-                href="#admin"
+                href={apkUrl}
                 className="rounded-full border border-accent/20 bg-surface px-6 py-3 text-center text-sm font-semibold text-accent-deep transition hover:-translate-y-0.5"
               >
-                View Admin Scope
+                Download APK
               </a>
             </div>
           </div>
@@ -132,6 +137,38 @@ export default function Home() {
         </div>
       </section>
 
+      <section id="download" className="mx-auto max-w-6xl px-6 pb-10 sm:px-10 lg:px-12">
+        <div className="rounded-[2rem] bg-white px-6 py-8 shadow-[0_18px_60px_rgba(29,20,15,0.08)] sm:px-8">
+          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-accent-deep">
+            Web + APK Distribution
+          </p>
+          <h2 className="mt-4 text-3xl font-semibold text-foreground">
+            Use the browser app or download the Android APK.
+          </h2>
+          <p className="mt-4 max-w-3xl text-base leading-7 text-muted">
+            Visitors can use the full web version in their browser, and Android users can install the APK directly from this site.
+          </p>
+          <div className="mt-8 flex flex-col gap-4 sm:flex-row">
+            <a
+              href={webAppUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="rounded-full bg-accent px-6 py-3 text-center text-sm font-semibold text-white shadow-[0_18px_40px_rgba(180,83,9,0.25)] transition hover:-translate-y-0.5 hover:bg-accent-deep"
+            >
+              Open Web Version
+            </a>
+            <a
+              href={apkUrl}
+              className="rounded-full border border-accent/20 bg-surface px-6 py-3 text-center text-sm font-semibold text-accent-deep transition hover:-translate-y-0.5"
+            >
+              Download APK
+            </a>
+          </div>
+          <p className="mt-4 text-sm leading-6 text-muted">
+            Add your APK to <code>apps/web/public/suyavaraa.apk</code> or replace the link with your hosted APK URL.
+          </p>
+        </div>
+      </section>
       <section id="deploy" className="mx-auto max-w-6xl px-6 pb-16 sm:px-10 lg:px-12">
         <div className="rounded-[2rem] border border-accent/15 bg-white px-6 py-8 shadow-[0_18px_60px_rgba(29,20,15,0.08)] sm:px-8">
           <p className="text-xs font-semibold uppercase tracking-[0.24em] text-accent-deep">

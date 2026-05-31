@@ -16,7 +16,7 @@ const { LinearGradient } = require('expo-linear-gradient');
 const Colors = require('../../theme/Colors');
 const paymentService = require('../../services/paymentService');
 const { Alert } = require('react-native');
-const { supabase } = require('../../supabase');
+const { supabase } = require('../../../supabase');
 
 const { width } = Dimensions.get('window');
 
